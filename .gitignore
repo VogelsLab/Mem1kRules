@@ -1,0 +1,24 @@
+data/
+
+# OS/editor artifacts
+.DS_Store
+.idea/
+.vscode/
+
+# Python cache/build artifacts
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
