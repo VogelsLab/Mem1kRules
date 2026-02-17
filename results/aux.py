@@ -1,6 +1,7 @@
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.pyplot as plt
+import torch
 
 
 ###  Define colors and colormaps of the paper
@@ -73,6 +74,110 @@ cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
 
 cmp_contnov = LinearSegmentedColormap('cmap_contextual_novelty', segmentdata=cdict, N=256)
 
+color_start= color_ee
+color_end = (80/256, 80/256, 80/256)
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+newcolors[0, :] = np.array([256/256, 256/256, 256/256, 1])
+cmap_ee = ListedColormap(newcolors)
+
+color_start= color_ei
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+newcolors[0, :] = np.array([256/256, 256/256, 256/256, 1])
+cmap_ei = ListedColormap(newcolors)
+
+color_start= color_ie
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+newcolors[0, :] = np.array([256/256, 256/256, 256/256, 1])
+cmap_ie = ListedColormap(newcolors)
+
+color_start= color_ii
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+newcolors[0, :] = np.array([256/256, 256/256, 256/256, 1])
+cmap_ii = ListedColormap(newcolors)
+
+color_start = (256/256, 256/256, 256/256)
+color_end = color_ee
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+cmap_ee_white = ListedColormap(newcolors)
+
+color_start = (256/256, 256/256, 256/256)
+color_end = color_ei
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+cmap_ei_white = ListedColormap(newcolors)
+
+color_start = (256/256, 256/256, 256/256)
+color_end = color_ie
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+cmap_ie_white = ListedColormap(newcolors)
+
+color_start = (256/256, 256/256, 256/256)
+color_end = color_ii
+cdict = {'red':   [[0.0,  color_start[0], color_start[0]],
+                   [1.0,  color_end[0], color_end[0]]],
+         'green': [[0.0,  color_start[1],color_start[1]],
+                   [1.0,  color_end[1], color_end[1]]],
+         'blue':  [[0.0,  color_start[2], color_start[2]],
+                   [1.0,  color_end[2], color_end[2]]]}
+newcmp = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=10000)
+aux_cm = newcmp.resampled(10000)
+newcolors = aux_cm(np.linspace(0, 1, 10000))
+cmap_ii_white = ListedColormap(newcolors)
 
 ### General functions for loading data, selecting stable rules
 
@@ -86,6 +191,31 @@ def load_and_merge(save_dir, paths):
         dataset = np.append(dataset, np.load(save_dir + paths[i]), axis=0)
     print("retrieved", str(len(dataset))+"/"+str(len(np.unique(dataset))) ,"simulations")
     return(dataset)
+
+def get_ind_stable(data):
+    # rates [0.1, 50]Hz for all break durations (used to be 0.1)
+    cond_rate = np.all(np.logical_and(0.1 <= data["rate"], data["rate"] <= 100), axis=1)
+    print(np.sum(cond_rate),"/",len(data), "rules fulfill the rate condition", np.sum(cond_rate)/len(data)*100,"%")
+
+    # cv > 0.7 for all break durations
+    cond_cv = np.all((data["cv_isi"] >= 0.7), axis=1)
+    print(np.sum(cond_cv),"/",len(data), "rules fulfill the cv condition", np.sum(cond_cv)/len(data)*100,"%")
+
+    # weef weif < 0.5, wief, wiif < 5 after 4h
+    cond_wf = np.logical_and( np.logical_and(data["weef"][:,-1] <= 0.5, data["weif"][:,-1] <= 0.5), np.logical_and(data["wief"][:,-1] <= 5, data["wiif"][:,-1] <= 5) )
+    print(np.sum(cond_wf),"/",len(data), "rules fulfill the wf condition", np.sum(cond_wf)/len(data)*100,"%")
+
+    # w_blow <= 0.1 after 4h (allowing for weights to do crazy stuff during the task itself), used to be fpr
+    cond_wb = data["w_blow"][:,-1] <= 0.1
+    print(np.sum(cond_wb),"/",len(data), "rules fulfill the w_blow condition", np.sum(cond_wb)/len(data)*100,"%")
+
+    # # w_creep < 0.2
+    # cond_wc = np.logical_and(data["w_creep"][:,-1] <= 0.2, data["w_creep"][:,-2] <= 0.2)
+    # print(np.sum(cond_wc),"/",len(data), "rules fulfill the wc condition", np.sum(cond_wc)/len(data)*100,"%")
+
+    cond_all = np.logical_and(np.logical_and(np.logical_and(cond_rate,cond_cv), cond_wf), cond_wb)
+    print(np.sum(cond_all),"/",len(data), "rules fulfill all conditions", np.sum(cond_all)/len(data)*100,"%")
+    return(cond_all)
 
 def get_ind_stable_MLP(data):
     # rates [0.5, 50]Hz for all break durations
@@ -112,6 +242,84 @@ def get_ind_stable_MLP(data):
     print(np.sum(cond_all),"/",len(data), "rules fulfill all conditions", np.sum(cond_all)/len(data)*100,"%")
     return(cond_all)
 
+def get_shape_histogram(rules, x_lim=[-0.2,0.2], n_timebins=1000, n_dwbins=500):
+    n_rules = len(rules)
+    
+    # 1/ get the rule's response to the pre post protocol
+    ts = torch.tile(torch.linspace(x_lim[0], x_lim[1], n_timebins), (n_rules,1)) # size [n_rules, n_timebins]
+    ind_t_pos = 0 #find where dt changes sign, that's when we switch which synaptic trace is non zero
+    while ts[0, ind_t_pos] < 0:
+        ind_t_pos += 1
+
+    if type(rules) == np.ndarray:
+        rules = torch.Tensor(rules)
+    rules_tiled = torch.tile(rules, (n_timebins, 1, 1)).T # size [n_rules, n_timebins]
+
+    dws_ee = np.zeros( (n_rules, n_timebins) )
+    dws_ei = np.zeros( (n_rules, n_timebins) )
+    dws_ie = np.zeros( (n_rules, n_timebins) )
+    dws_ii = np.zeros( (n_rules, n_timebins) )
+
+    dws_ee[:,:ind_t_pos] = rules_tiled[2,:,:ind_t_pos] + rules_tiled[3,:,:ind_t_pos] + torch.mul(rules_tiled[5,:,:ind_t_pos], torch.exp(torch.div(-torch.abs(ts[:,:ind_t_pos]), rules_tiled[1,:,:ind_t_pos])))
+    dws_ee[:,ind_t_pos:] = rules_tiled[2,:,ind_t_pos:] + rules_tiled[3,:,ind_t_pos:] + torch.mul(rules_tiled[4,:,ind_t_pos:], torch.exp(torch.div(-torch.abs(ts[:,ind_t_pos:]), rules_tiled[0,:,ind_t_pos:])))
+    
+    dws_ei[:,:ind_t_pos] = rules_tiled[2+6,:,:ind_t_pos] + rules_tiled[3+6,:,:ind_t_pos] + torch.mul(rules_tiled[5+6,:,:ind_t_pos], torch.exp(torch.div(-torch.abs(ts[:,:ind_t_pos]), rules_tiled[1+6,:,:ind_t_pos])))
+    dws_ei[:,ind_t_pos:] = rules_tiled[2+6,:,ind_t_pos:] + rules_tiled[3+6,:,ind_t_pos:] + torch.mul(rules_tiled[4+6,:,ind_t_pos:], torch.exp(torch.div(-torch.abs(ts[:,ind_t_pos:]), rules_tiled[0+6,:,ind_t_pos:])))
+
+    dws_ie[:,:ind_t_pos] = rules_tiled[2+2*6,:,:ind_t_pos] + rules_tiled[3+2*6,:,:ind_t_pos] + torch.mul(rules_tiled[5+2*6,:,:ind_t_pos], torch.exp(torch.div(-torch.abs(ts[:,:ind_t_pos]), rules_tiled[1+2*6,:,:ind_t_pos])))
+    dws_ie[:,ind_t_pos:] = rules_tiled[2+2*6,:,ind_t_pos:] + rules_tiled[3+2*6,:,ind_t_pos:] + torch.mul(rules_tiled[4+2*6,:,ind_t_pos:], torch.exp(torch.div(-torch.abs(ts[:,ind_t_pos:]), rules_tiled[0+2*6,:,ind_t_pos:])))
+
+    dws_ii[:,:ind_t_pos] = rules_tiled[2+3*6,:,:ind_t_pos] + rules_tiled[3+3*6,:,:ind_t_pos] + torch.mul(rules_tiled[5+3*6,:,:ind_t_pos], torch.exp(torch.div(-torch.abs(ts[:,:ind_t_pos]), rules_tiled[1+3*6,:,:ind_t_pos])))
+    dws_ii[:,ind_t_pos:] = rules_tiled[2+3*6,:,ind_t_pos:] + rules_tiled[3+3*6,:,ind_t_pos:] + torch.mul(rules_tiled[4+3*6,:,ind_t_pos:], torch.exp(torch.div(-torch.abs(ts[:,ind_t_pos:]), rules_tiled[0+3*6,:,ind_t_pos:])))
+
+    # 2/ make a histogram of dws across rules, one per time bin
+    # normalize rule responses first (get rid of learning rate effects)
+    dws_norm_ee = np.zeros( (n_rules, n_timebins) )
+    dws_norm_ei = np.zeros( (n_rules, n_timebins) )
+    dws_norm_ie = np.zeros( (n_rules, n_timebins) )
+    dws_norm_ii = np.zeros( (n_rules, n_timebins) )
+    for i in range(n_rules):
+        dws_norm_ee[i,:] = dws_ee[i,:]/np.max(np.abs(dws_ee[i,:]))
+        dws_norm_ei[i,:] = dws_ei[i,:]/np.max(np.abs(dws_ei[i,:]))
+        dws_norm_ie[i,:] = dws_ie[i,:]/np.max(np.abs(dws_ie[i,:]))
+        dws_norm_ii[i,:] = dws_ii[i,:]/np.max(np.abs(dws_ii[i,:]))
+
+    # 3/ make a histogram of dws across rules, one per time bin
+    dws_hist_norm_ee = np.zeros( (n_timebins, n_dwbins) )
+    dws_hist_norm_ei = np.zeros( (n_timebins, n_dwbins) )
+    dws_hist_norm_ie = np.zeros( (n_timebins, n_dwbins) )
+    dws_hist_norm_ii = np.zeros( (n_timebins, n_dwbins) )
+    for i in range(n_timebins):
+        dws_hist_aux_norm_ee,_ = np.histogram(dws_norm_ee[:,i], bins=n_dwbins, range=[-1, 1])
+        dws_hist_norm_ee[i,:] = dws_hist_aux_norm_ee
+
+        dws_hist_aux_norm_ei,_ = np.histogram(dws_norm_ei[:,i], bins=n_dwbins, range=[-1, 1])
+        dws_hist_norm_ei[i,:] = dws_hist_aux_norm_ei
+
+        dws_hist_aux_norm_ie,_ = np.histogram(dws_norm_ie[:,i], bins=n_dwbins, range=[-1, 1])
+        dws_hist_norm_ie[i,:] = dws_hist_aux_norm_ie
+
+        dws_hist_aux_norm_ii,_ = np.histogram(dws_norm_ii[:,i], bins=n_dwbins, range=[-1, 1])
+        dws_hist_norm_ii[i,:] = dws_hist_aux_norm_ii
+    _,dw_bins_norm = np.histogram(dws_norm_ee[:,0], bins=n_dwbins, range=[-1, 1])
+
+    return(dws_ee, dws_ei, dws_ie, dws_ii, dws_hist_norm_ee, dws_hist_norm_ei, dws_hist_norm_ie, dws_hist_norm_ii)
+
+def N_AND(conditions):
+    #condition list of conditions
+    n_conditions = len(conditions)
+    cond = conditions[0]
+    for i in range(1, n_conditions):
+        cond = np.logical_and(cond, conditions[i])
+    return(cond)
+
+def N_OR(conditions):
+    #condition list of conditions
+    n_conditions = len(conditions)
+    cond = conditions[0]
+    for i in range(1, n_conditions):
+        cond = np.logical_or(cond, conditions[i])
+    return(cond)
 
 ### General plotting
 
@@ -255,6 +463,455 @@ def plot_raster_w_engrams(sts, neuron_labels=None, n_recorded=None, t_start_each
 
     for i,t in enumerate(t_start_each_stim):
         ax.plot([t,t+ontime], [y_stim_line,y_stim_line], color=label_colors[i], linewidth=linewidth_stim_line,
+                solid_capstyle="butt")
+
+    if x_label is not None:
+        fig.text(xlabel_xloc, xlabel_yloc, x_label, fontsize=fontsize, fontname=font, ha='center')
+
+    if y_label is not None:
+        ax.plot([y_bar_xloc, y_bar_xloc], y_bar_ylocs, transform=ax.transAxes, color="black", clip_on=False, linewidth=axwidth)
+        fig.text(ylabel_xloc, ylabel_yloc, y_label, fontsize=fontsize, fontname=font, rotation=90, ha='center')
+
+    if y_lim is not None:
+        ax.set_ylim(y_lim)
+    else:
+        ax.set_ylim([-1, n_recorded + 0.1])
+    if y_ticks is None:
+        ax.set_yticks([0, n_recorded])
+    else:
+        ax.set_yticks(y_ticks)
+    if y_ticklabels is not None:
+        ax.set_yticklabels(y_ticklabels)
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.tick_params(width=tickwidth, labelsize=fontsize, length=tickwidth*2, pad = 10)
+    ax.tick_params(axis='y', pad = 0)
+
+    if cartoon:
+        plt.gca().set_axis_off()
+        plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, 
+                    hspace = 0, wspace = 0)
+        plt.margins(0,0)
+        plt.savefig("cartoon_raster.png")
+
+    return
+
+def plot_4_rules(thetas,
+                n_bins=1000,
+                x_lim=[-0.2,0.2],
+                y_lim = [-1,1],
+                y_ticks=[],
+                x_ticks=[],
+                x_ticklabels=None,
+                x_label=r'$\Delta t$',
+                y_label=r'$\Delta w$',
+                color_ee=(165/256,42/256,42/256),
+                color_ei=(242/256, 140/256, 40/256),
+                color_ie=(8/256, 143/256, 143/256),
+                color_ii=(47/256, 85/256, 151/256),
+                color_ylabel="black",
+                figsize=(0.6,0.1),
+                labelpad_xlabel=1,
+                fontsize=10,
+                labelpad_ylabel=27,
+                linewidth=0.8,
+                axwidth=0.8,
+                dpi=600,
+                xticks_pad=0,
+                yticks_pad=0,
+                rotation=0,
+                font='arial',
+                y_ticklabels=None,
+                save_fig=False,
+                path=""):
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1,4,figsize=figsize, dpi=dpi, gridspec_kw={'width_ratios': [1, 1, 1, 1]})
+
+    ts = np.linspace(x_lim[0], x_lim[1],num=n_bins)
+    ind_t_pos = 0
+    while ts[ind_t_pos] < 0:
+        ind_t_pos += 1
+
+    dws = np.array([thetas[2] + thetas[3] + thetas[5]*np.exp(-np.abs(ts[i])/thetas[1]) for i in range(ind_t_pos)])
+    dws = np.append(dws, np.array([thetas[2] + thetas[3] + thetas[4]*np.exp(-np.abs(ts[i])/thetas[0]) for i in range(ind_t_pos, len(ts))]), axis=0)
+    line1_1, = ax1.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ee, linewidth=linewidth)
+    line1_2, = ax1.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ee, linewidth=linewidth)
+    ax1.set_xlim(x_lim)
+    ax1.set_xticks(x_ticks)
+    ax1.set_ylim([-1.15*np.max(np.abs(dws)), 1.15*np.max(np.abs(dws))])
+    ax1.set_yticks(y_ticks)
+    # ax1.set_ylabel(y_label, fontsize=fontsize, fontname=font, labelpad = labelpad_ylabel, color=color_ylabel)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(axwidth)
+    ax1.spines['left'].set_linewidth(axwidth)
+    ax1.spines['bottom'].set_position('zero')
+    ax1.spines['left'].set_position('zero')
+    ax1.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax1.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    line1_1.set_solid_capstyle('round')
+    line1_2.set_solid_capstyle('round')
+
+    dws = np.array([thetas[2+6] + thetas[3+6] + thetas[5+6]*np.exp(-np.abs(ts[i])/thetas[1+6]) for i in range(ind_t_pos)])
+    dws = np.append(dws, np.array([thetas[2+6] + thetas[3+6] + thetas[4+6]*np.exp(-np.abs(ts[i])/thetas[0+6]) for i in range(ind_t_pos, len(ts))]), axis=0)
+    # line2 = ax2.plot(ts, dws, color=color_ei, linewidth=linewidth)
+    line2_1, = ax2.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ei, linewidth=linewidth)
+    line2_2, = ax2.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ei, linewidth=linewidth)
+    ax2.set_xlim(x_lim)
+    ax2.set_xticks(x_ticks)
+    ax2.set_ylim([-1.15*np.max(np.abs(dws)), 1.15*np.max(np.abs(dws))])
+    ax2.set_yticks(y_ticks)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['bottom'].set_linewidth(axwidth)
+    ax2.spines['left'].set_linewidth(axwidth)
+    ax2.spines['bottom'].set_position('zero')
+    ax2.spines['left'].set_position('zero')
+    ax2.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax2.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    line2_1.set_solid_capstyle('round')
+    line2_2.set_solid_capstyle('round')
+
+    dws = np.array([thetas[2+2*6] + thetas[3+2*6] + thetas[5+2*6]*np.exp(-np.abs(ts[i])/thetas[1+2*6]) for i in range(ind_t_pos)])
+    dws = np.append(dws, np.array([thetas[2+2*6] + thetas[3+2*6] + thetas[4+2*6]*np.exp(-np.abs(ts[i])/thetas[0+2*6]) for i in range(ind_t_pos, len(ts))]), axis=0)
+    # line3 = ax3.plot(ts, dws, color=color_ie, linewidth=linewidth)
+    line3_1, = ax3.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ie, linewidth=linewidth)
+    line3_2, = ax3.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ie, linewidth=linewidth)
+    ax3.set_xlim(x_lim)
+    ax3.set_xticks(x_ticks)
+    ax3.set_ylim([-1.15*np.max(np.abs(dws)), 1.15*np.max(np.abs(dws))])
+    ax3.set_yticks(y_ticks)
+    ax3.spines['top'].set_visible(False)
+    ax3.spines['right'].set_visible(False)
+    ax3.spines['bottom'].set_linewidth(axwidth)
+    ax3.spines['left'].set_linewidth(axwidth)
+    ax3.spines['bottom'].set_position('zero')
+    ax3.spines['left'].set_position('zero')
+    ax3.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax3.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    line3_1.set_solid_capstyle('round')
+    line3_2.set_solid_capstyle('round')
+
+    dws = np.array([thetas[2+3*6] + thetas[3+3*6] + thetas[5+3*6]*np.exp(-np.abs(ts[i])/thetas[1+3*6]) for i in range(ind_t_pos)])
+    dws = np.append(dws, np.array([thetas[2+3*6] + thetas[3+3*6] + thetas[4+3*6]*np.exp(-np.abs(ts[i])/thetas[0+3*6]) for i in range(ind_t_pos, len(ts))]), axis=0)
+    # line4 = ax4.plot(ts, dws, color=color_ii, linewidth=linewidth)
+    line4_1, = ax4.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ii, linewidth=linewidth)
+    line4_2, = ax4.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ii, linewidth=linewidth)
+    ax4.set_xlim(x_lim)
+    ax4.set_xticks(x_ticks)
+    ax4.set_ylim([-1.15*np.max(np.abs(dws)), 1.15*np.max(np.abs(dws))])
+    ax4.set_yticks(y_ticks)
+    ax4.spines['top'].set_visible(False)
+    ax4.spines['right'].set_visible(False)
+    ax4.spines['bottom'].set_linewidth(axwidth)
+    ax4.spines['left'].set_linewidth(axwidth)
+    ax4.spines['bottom'].set_position('zero')
+    ax4.spines['left'].set_position('zero')
+    ax4.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax4.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    line4_1.set_solid_capstyle('round') #'butt', 'projecting', 'round'
+    line4_2.set_solid_capstyle('round')
+
+    # fig.text(0.1, 0.05, x_label, ha='center')
+    # fig.text(0.05, 0.6, y_label, va='center', rotation='vertical')
+    plt.subplots_adjust(wspace=0.2, hspace=0)
+    if save_fig:
+        plt.savefig(path, transparent=True)
+    fig.show()
+
+def plot_4_rules_histogram(dws_hist_ee,
+                           dws_hist_ei,
+                           dws_hist_ie,
+                           dws_hist_ii,
+                           cmap_list = ['viridis', 'viridis', 'viridis', 'viridis'],
+                            # x_lim=[-0.2,0.2],
+                            # y_lim = [-1,1],
+                            cap = 25,
+                            y_ticks=[],
+                            x_ticks=[],
+                            x_ticklabels=None,
+                            x_label=r'$\Delta t$',
+                            y_label=r'$\Delta w$',
+                            color_ee=(165/256,42/256,42/256),
+                            color_ei=(242/256, 140/256, 40/256),
+                            color_ie=(8/256, 143/256, 143/256),
+                            color_ii=(47/256, 85/256, 151/256),
+                            color_ylabel="black",
+                            figsize=(0.6,0.1),
+                            labelpad_xlabel=1,
+                            fontsize=10,
+                            labelpad_ylabel=27,
+                            linewidth=0.8,
+                            axwidth=0.8,
+                            dpi=600,
+                            xticks_pad=0,
+                            yticks_pad=0,
+                            rotation=0,
+                            font='arial',
+                            y_ticklabels=None,
+                            save_fig=False,
+                            path=""):
+    
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1,4,figsize=figsize, dpi=dpi, gridspec_kw={'width_ratios': [1, 1, 1, 1]})
+
+    n_dwbins = dws_hist_ee.shape[1]
+    n_timebins = dws_hist_ee.shape[0]
+    
+    ax1.imshow(np.flip(dws_hist_ee, axis=1).T, vmin=0, vmax=cap, aspect=(n_timebins)/(n_dwbins)*figsize[0]/figsize[1]/4, cmap=cmap_list[0])
+    ax1.axvline(x=n_timebins//2, ymin=-1, ymax=1, linewidth=linewidth, color='black')
+    ax1.plot([0,n_timebins-1], [n_dwbins//2,n_dwbins//2], linewidth=linewidth, color='black')
+    ax1.set_xticks(x_ticks)
+    ax1.set_yticks(y_ticks)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_visible(False)
+    ax1.spines['left'].set_visible(False)
+    ax1.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax1.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    ax2.imshow(np.flip(dws_hist_ei, axis=1).T, vmin=0, vmax=cap, aspect=(n_timebins)/(n_dwbins)*figsize[0]/figsize[1]/4, cmap=cmap_list[1])
+    ax2.axvline(x=n_timebins//2, ymin=-1, ymax=1, linewidth=linewidth, color='black')
+    ax2.plot([0,n_timebins-1], [n_dwbins//2,n_dwbins//2], linewidth=linewidth, color='black')
+    ax2.set_xticks(x_ticks)
+    ax2.set_yticks(y_ticks)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['bottom'].set_visible(False)
+    ax2.spines['left'].set_visible(False)
+    ax2.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax2.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    ax3.imshow(np.flip(dws_hist_ie, axis=1).T, vmin=0, vmax=cap, aspect=(n_timebins)/(n_dwbins)*figsize[0]/figsize[1]/4, cmap=cmap_list[2])
+    ax3.axvline(x=n_timebins//2, ymin=-1, ymax=1, linewidth=linewidth, color='black')
+    ax3.plot([0,n_timebins-1], [n_dwbins//2,n_dwbins//2], linewidth=linewidth, color='black')
+    ax3.set_xticks(x_ticks)
+    ax3.set_yticks(y_ticks)
+    ax3.spines['top'].set_visible(False)
+    ax3.spines['right'].set_visible(False)
+    ax3.spines['bottom'].set_visible(False)
+    ax3.spines['left'].set_visible(False)
+    ax3.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax3.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    ax4.imshow(np.flip(dws_hist_ii, axis=1).T, vmin=0, vmax=cap, aspect=(n_timebins)/(n_dwbins)*figsize[0]/figsize[1]/4, cmap=cmap_list[3])
+    ax4.axvline(x=n_timebins//2, ymin=-1, ymax=1, linewidth=linewidth, color='black')
+    ax4.plot([0,n_timebins-1], [n_dwbins//2,n_dwbins//2], linewidth=linewidth, color='black')
+    ax4.set_xticks(x_ticks)
+    ax4.set_yticks(y_ticks)
+    ax4.spines['top'].set_visible(False)
+    ax4.spines['right'].set_visible(False)
+    ax4.spines['bottom'].set_visible(False)
+    ax4.spines['left'].set_visible(False)
+    ax4.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax4.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    plt.subplots_adjust(wspace=0.2, hspace=0)
+    if save_fig:
+        plt.savefig(path, transparent=True)
+    fig.show()
+
+def plot_fraction_significant_rules(prop, figsize=(1,1), dpi=600, x_lim=None, x_ticks=None, x_ticklabels=None,
+                                   x_label=None, y_lim=None, y_ticks=None, y_ticklabels=None, y_label=None,
+                                   axwidth=1.5, linewidth=1.5, xticks_pad=5, yticks_pad=0, labelpad_xlabel=5,
+                                   labelpad_ylabel=0, color='black', fontsize=10, font='Arial'):
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    ax.plot(prop, linewidth=linewidth, color=color, clip_on=False)
+
+    if x_lim is not None:
+        ax.set_xlim(x_lim)
+    if x_ticks is not None:
+        ax.set_xticks(x_ticks)
+    if x_ticklabels is not None:
+        ax.set_xticklabels(x_ticklabels)
+    if x_label is not None:
+        ax.set_xlabel(x_label, fontsize=fontsize, fontname=font, labelpad = labelpad_xlabel)
+
+    if y_lim is not None:
+        ax.set_ylim([y_lim[0], y_lim[1]])
+        ax.set_yticks([y_lim[0], y_lim[1]])
+    if y_ticks is not None:
+        ax.set_yticks(y_ticks)
+    else:
+        ax.set_yticks([])
+    if y_ticklabels is not None:
+        ax.set_yticklabels(y_ticklabels)
+    if y_label is not None:
+        ax.set_ylabel(y_label, fontsize=fontsize, fontname=font, labelpad = labelpad_ylabel)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+
+    ax.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    plt.show()
+
+def plot_input_raster(sts, neuron_indices, t_lim=None, fontsize=10, color="black", x_label="", y_label="", 
+                      markersize=0.05, figsize=(20, 3), font="arial", x_ticks=None, x_ticklabels=None, x_tickspad=0,
+                      y_ticks=None, y_ticklabels=None, y_tickspad=0, tickwidth=2, dpi=600):
+    """
+    Make a raster plot from an array of spike times
+
+    args: sts dict key=neuron_id value = np.array(float) spiketimes
+          neurons_ids list(int)
+          t_lim = [t_min,t_max] float in seconds OR "default" 
+          save_path str: if not "" will same the figure
+          other args are cosmetic kwargs from matplotlib, see matplotlib documentation
+
+    returns: matplotlib axis
+    """
+    n_to_plot = len(neuron_indices)
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    ct = 0
+    for neuron_num in neuron_indices:
+        # ax.plot(sts[str(neuron_num)], np.full(len(sts[str(neuron_num)]), ct), linestyle='', marker='.',color=color, markersize=markersize)
+        ax.scatter(sts[str(neuron_num)], np.full(len(sts[str(neuron_num)]), ct), linewidths=0, color=color, s=markersize, edgecolors=None, marker='.')
+        ct += 1
+    if t_lim is not None:
+        ax.set_xlim([t_lim[0], t_lim[1]])
+    if (t_lim is None) and (x_ticks is not None):
+        ax.set_xlim([x_ticks[0], x_ticks[-1]])
+    if x_ticks is None:
+        ax.set_xticks([t_lim[0], t_lim[1]])
+    else:
+        ax.set_xticks(x_ticks)
+    if x_ticklabels is not None:
+        ax.set_xticklabels(x_ticklabels)
+    ax.set_xlabel(x_label, fontsize=fontsize, fontname=font, labelpad = 0)
+    
+    ax.set_ylim([0, n_to_plot + 0.1])
+    if y_ticks is None:
+        ax.set_yticks([0, n_to_plot])
+    else:
+        ax.set_yticks(y_ticks)
+    if y_ticklabels is not None:
+        ax.set_yticklabels(y_ticklabels)
+    ax.set_ylabel(y_label, fontsize=fontsize, fontname=font, labelpad = 0)
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.tick_params(width=tickwidth, labelsize=fontsize, length=tickwidth*2, pad=x_tickspad)
+    ax.tick_params(axis='y', pad=y_tickspad)
+    plt.show()
+    return()
+
+def plot_engram_matrix(w=None, pre_engrams=None, post_engrams=None, 
+                       engrams_to_plot=None,
+                       N_familiar=None, dpi=600,
+                       labels=['n1', 'n2', 'f1', 'f2', 'f3', 'f4', 'f5'],
+                       mean_weight=None,
+                v_lim = None, figsize=(5,5), save_path=None, cmap="cividis",xlabel="post", xlabelpad=0, xticklabelpad=0,
+                ylabel="pre", ylabelpad=0, yticklabelpad=0,
+                axwidth=2, font = "Arial", fontsize=15, ax=None, cbarticks=None, cbarticklabels=[''], cbarlabel=None): 
+    
+    # Making matrix
+    n_patterns = len(engrams_to_plot)
+    # x = ["n"+str(i+1) for i in range(n_patterns-N_familiar)] + ["f"+str(i+1) for i in range(N_familiar)]
+    
+    z=np.zeros((n_patterns, n_patterns))
+    for i, pre_stim in enumerate(engrams_to_plot):
+        for j, post_stim in enumerate(engrams_to_plot):
+            z[i,j] = get_mean_weight(w, pre_engrams[str(pre_stim)], post_engrams[str(post_stim)])
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    
+    if v_lim is None:
+        v_lim = [np.min(z), np.max(z)]
+    print(np.min(z), np.mean(z), np.max(z))
+
+    if mean_weight is not None:
+        dmax = np.max(np.abs(z-mean_weight))
+        v_lim = [np.max([mean_weight-dmax,0]), mean_weight+dmax]
+        cbarticks = [np.max([mean_weight-dmax,0]), mean_weight, mean_weight+dmax]
+        cbarticklabels = [str(np.round(np.max([mean_weight-dmax,0]), 2)), cbarticklabels[0], str(np.round(mean_weight+dmax,2))]
+        if mean_weight-dmax < 0: #weights can't be egative, truncate teh colormap so that mean weight is still white
+            cmap = truncate_colormap(cmap, minval= 0.5 - mean_weight/dmax/2, maxval=1)
+            # print(cbarticks, mean_weight/dmax, dmax)
+
+    ax.set_xlabel(xlabel, fontsize=fontsize, fontname=font, labelpad=xlabelpad)
+    ax.xaxis.set_label_position('top')
+    ax.set_ylabel(ylabel, fontsize=fontsize, fontname=font, labelpad=ylabelpad)
+    
+    matrice = ax.imshow(z, vmin=v_lim[0], vmax=v_lim[1], cmap=plt.get_cmap(cmap))
+    
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_xticklabels(labels)
+    ax.tick_params(axis='x', which='major', pad=xticklabelpad)
+    ax.set_yticks(np.arange(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.tick_params(axis='y', which='major', pad=yticklabelpad)
+    
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(matrice, cax=cax, drawedges=False)
+    if cbarticks is not None:
+        cbar.set_ticks(cbarticks)
+    if cbarticklabels is not None:
+        cbar.ax.set_yticklabels(cbarticklabels)
+        cbar.ax.yaxis.set_tick_params(pad=1)
+    cbar.set_label(label=cbarlabel, size=fontsize)
+    cbar.outline.set_color('black')
+    cbar.outline.set_linewidth(axwidth)
+    cbar.ax.tick_params(labelsize=fontsize, width=axwidth, length=2*axwidth)
+    
+    ax.spines['top'].set_linewidth(axwidth)
+    ax.spines['right'].set_linewidth(axwidth)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+    ax.tick_params(width=axwidth, labelsize=fontsize, length=2*axwidth, top=True, bottom=False, labeltop=True, labelbottom=False)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    if save_path!=None and ax != None: 
+        fig.savefig(save_path+ ".png", format='png', dpi=800, transparent=True, bbox_inches='tight')
+    plt.show()
+    return()
+
+def plot_raster_w_engrams_sep_background(sts, neuron_labels=None, n_recorded=None, t_start_each_stim = None, n_tot_stim=7,
+                          x_lim=None, y_lim=None, fontsize=20, colors_raster=None, colors_label=None, ontime=None,
+                x_label="", y_label="", markersize=0.05, figsize=(20, 3), linewidth_stim_line=3,
+                font="arial", x_ticks=None, x_ticklabels=None, y_ticks=None, y_stim_line=None, lag_engr_bg=20, lag_engr_engr=5,
+                y_ticklabels=None, tickwidth=2, axwidth=3, dpi=200, ylabel_xloc=-0.1,
+                ylabel_yloc=0.15, xlabel_xloc=0.4, xlabel_yloc=-0.1, y_bar_xloc=-0.1, y_bar_ylocs=[2.85/7, 3.6/7], cartoon=False):
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    ct = 0
+    for label_num in range(0,5,+1):
+        neurons_to_plot = np.argwhere(neuron_labels==label_num).flatten()
+        for neuron_num in neurons_to_plot:
+            ax.scatter(sts[str(neuron_num)], np.full(len(sts[str(neuron_num)]), ct), linewidths=0, color=colors_raster[label_num], s=markersize, edgecolors=None, marker='o')
+            ct += 1
+        ct += lag_engr_engr
+    
+    # plot background activity
+    neurons_to_plot = np.argwhere(neuron_labels==5).flatten()
+    ct += lag_engr_bg
+    for neuron_num in neurons_to_plot:
+        ax.scatter(sts[str(neuron_num)], np.full(len(sts[str(neuron_num)]), ct), linewidths=0, color=colors_raster[5], s=markersize, edgecolors=None, marker='o')
+        ct += 1
+
+
+    if x_lim is not None:
+        ax.set_xlim(x_lim)
+    if (x_lim is None) and (x_ticks is not None):
+        ax.set_xlim([x_ticks[0], x_ticks[-1]])
+    if x_ticks is None:
+        ax.set_xticks([x_lim[0], x_lim[1]])
+    else:
+        ax.set_xticks(x_ticks)
+    if x_ticklabels is not None:
+        ax.set_xticklabels(x_ticklabels)
+
+    for i,t in enumerate(t_start_each_stim):
+        ax.plot([t,t+ontime], [y_stim_line+lag_engr_bg+4*lag_engr_engr,y_stim_line+lag_engr_bg+4*lag_engr_engr], color=colors_label[i%n_tot_stim], linewidth=linewidth_stim_line,
                 solid_capstyle="butt")
 
     if x_label is not None:
@@ -635,7 +1292,135 @@ def get_binned_spikes_big(spiketimes, test_starts, l_pre_test_record, l_1test, b
         ts_big[i] = bins[:-1]
     return(binned_spikes_big)
 
-def get_engram_neurons(n_tot_stim, lpt, l_stim_on_pretraineng, l_stim_off_pretraineng, frac_size_engram, n_recorded, spiketimes):
+def get_engram_neurons(spiketimes, start_times, duration=1, n_tot_stim=7, frac_size_engram=0.1, n_neurons=4096):
+    n_engrams = n_tot_stim
+    n_neurons_per_engrams = int(frac_size_engram*n_neurons)
+    engrams = np.zeros((n_engrams,n_neurons_per_engrams), dtype=int)
+
+    #for each stimulus, pick the top N most active neurons (given by frac_size)
+    for stim_num in range(n_tot_stim):
+        #get individual firing rates
+        rs = get_individual_rates(spiketimes, start_times[stim_num], 
+                                        start_times[stim_num] + duration)
+        sorted_array = np.argsort(rs)
+        engrams[stim_num] = sorted_array[-n_neurons_per_engrams:]
+
+    engrams_dict = dict()
+    for i in range(n_engrams):
+        engrams_dict[str(i)] = engrams[i]
+    return(engrams_dict)
+
+def get_individual_rates(spiketimes, start, stop, n_neurons=4096):
+        """
+        Compute the the firing of each recorded (excitatory) neuron 
+        between start and stop
+        """
+        rates = np.zeros(n_neurons)
+        for neuron in range(n_neurons):
+            rates[neuron] =  np.sum(np.logical_and(start<=spiketimes[str(neuron)], 
+                                                   spiketimes[str(neuron)]<=stop))/(stop-start)
+        return(rates)
+
+def read_monitor_spiketime_files(filename, num_neurons=4096):
+
+    spiketimes = {str(neuron): [] for neuron in range(num_neurons)}
+
+    try:
+        f = open(filename, "r")
+    except:
+        print("problem with st file, returning None")
+        return(None)
+    lines = f.readlines()
+    for line in lines:
+        aux = line.split(" ")
+        try:
+            spiketimes[str(int(aux[1]))].append(float(aux[0]))
+        except:
+            print("problem with file", filename)
+    return spiketimes
+
+def load_w_mat(filename):
+    """
+    loads a full weight matrix from file as a dictionnary. weight matrix itself stored as a structured array
+    Format: np.array([int pre, int post, float weight])
+    Careful: Matrix market format starts at 1
+    w["n_from"] int
+    w["n_to"] int
+    w["n_w_non_zero"] int
+    w["w"] array(dtype=('pre',np.uint16),('post',np.uint16),('w',np.float32))
+    """    
+    
+    with open(filename) as file:
+        for i, line in enumerate(file):
+            aux = line.split(" ")
+            if i >= 6:
+                ws["w"][i-6] = (int(aux[0]), int(aux[1]), float(aux[2]))
+            elif i < 5:
+                pass
+            elif i == 5:
+                n_from = int(aux[0])
+                n_to = int(aux[1])
+                n_w_non_zero = int(aux[2])
+                print("matrix found from", n_from, "to", n_to, "neurons.", np.round(n_w_non_zero/n_from/n_to*100, 2), "% sparsity")
+                ws = dict()
+                ws["n_from"]=n_from
+                ws["n_to"]=n_to
+                ws["n_w_non_zero"]=n_w_non_zero
+                dt = np.dtype([('pre',np.uint16),('post',np.uint16),('w',np.float32)])
+                ws["w"]=np.zeros( (ws["n_w_non_zero"],), dt )
+            
+    return(ws)
+
+def get_mean_weight(w, pre_targets, post_targets):
+    pre_w_ind = np.in1d(w["w"]['pre'], pre_targets)
+    post_w_ind = np.in1d(w["w"]['post'], post_targets)
+    pre_and_post_w_ind = np.logical_and(pre_w_ind, post_w_ind)
+    return(np.mean(w["w"]['w'][pre_and_post_w_ind]))
+
+def translate_engram(engram):
+    translated_engram = dict()
+    for key in engram.keys():
+        translated_engram[key] = [i + 1 for i in engram[key]]
+    return(translated_engram)
+
+def get_non_engrams(list_stim_consider, engram_dict, n_neurons=4096):
+    ind_engram_neurons = []
+    for stim_num in list_stim_consider:
+        ind_engram_neurons += list(engram_dict[str(stim_num)])
+    ind_engram_neurons = np.unique(ind_engram_neurons)
+    non_engram_neurons = []
+    for neuron in range(n_neurons):
+        if neuron not in ind_engram_neurons:
+            non_engram_neurons.append(neuron)
+    return(np.array(non_engram_neurons))
+
+def get_eng_rate_npy(spiketimes, test_starts, l_pre_test_record, l_1test, bin_size_big, n_tests, n_recorded, n_tot_stim, engrams):
+    binned_spikes_big = get_binned_spikes_big_npy(spiketimes, test_starts, l_pre_test_record, l_1test, bin_size_big, n_tests, n_recorded)
+    eng_rate = np.zeros((n_tests, n_tot_stim, binned_spikes_big.shape[2]))
+    for engram_num in range(n_tot_stim):
+        neur_ind_keep = [True if i in engrams[engram_num] else False for i in range(n_recorded)]
+        eng_rate[:,engram_num, :] = np.mean(binned_spikes_big[:,neur_ind_keep,:], axis=1)
+    return(eng_rate/bin_size_big)
+
+def get_binned_spikes_big_npy(spiketimes, test_starts, l_pre_test_record, l_1test, bin_size_big, n_tests,
+                          n_recorded):
+    """
+    computes binned_spikes for each recorded neuron. 
+    Since we have several test sessions during a single simulation, we use a type
+    ts = np.array[n_test_phases, n_bins]
+    binned_spikes = np.array[n_test_phases, n_neurons, n_bins]
+    """
+    n_bins_per_test = len( np.arange( test_starts[0]-l_pre_test_record-0.001 ,  test_starts[0]+l_1test+.001 , bin_size_big ) ) - 1
+    ts_big = np.zeros((n_tests, n_bins_per_test))
+    binned_spikes_big = np.zeros((n_tests, n_recorded, n_bins_per_test))
+    for i in range(n_tests):
+        bins = np.arange(test_starts[i]-l_pre_test_record-0.001, test_starts[i]+l_1test+0.001, bin_size_big)
+        binned_spikes_big[i] = np.array([np.histogram(spiketimes[str(neuron_num)], bins=bins)[0] \
+                for neuron_num in range(n_recorded)])
+        ts_big[i] = bins[:-1]
+    return(binned_spikes_big)
+
+def get_engram_neurons_npy(n_tot_stim, lpt, l_stim_on_pretraineng, l_stim_off_pretraineng, frac_size_engram, n_recorded, spiketimes):
     #goal: get the top frac_size most active neurons during presentation 
     #of each stimulus before we even start the task
 
@@ -652,14 +1437,14 @@ def get_engram_neurons(n_tot_stim, lpt, l_stim_on_pretraineng, l_stim_off_pretra
     #for each stimulus, pick the top N most active neurons (given by frac_size)
     for stim_num in range(n_tot_stim):
         #get individual firing rates
-        rs = get_individual_rates(start_times_stim_pretraineng[stim_num], 
+        rs = get_individual_rates_npy(start_times_stim_pretraineng[stim_num], 
                                 start_times_stim_pretraineng[stim_num] + l_stim_on_pretraineng,
                                 spiketimes, n_recorded)
         sorted_array = np.argsort(rs)
         engrams[stim_num] = sorted_array[-n_neurons_per_engrams:]
     return(engrams)
 
-def get_individual_rates(start, stop, spiketimes, n_recorded):
+def get_individual_rates_npy(start, stop, spiketimes, n_recorded):
     """
     Compute the the firing of each recorded (excitatory) neuron 
     between start and stop
@@ -669,3 +1454,4 @@ def get_individual_rates(start, stop, spiketimes, n_recorded):
         rates[neuron] =  np.sum(np.logical_and(start<=spiketimes[str(neuron)], 
                                             spiketimes[str(neuron)]<=stop))/(stop-start)
     return(rates)
+#
