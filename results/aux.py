@@ -3,6 +3,10 @@ from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.pyplot as plt
 import torch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import h5py
+import matplotlib.patheffects as pe
+import re
+from scipy.ndimage import gaussian_filter
 
 ###  Define colors and colormaps of the paper
 
@@ -179,6 +183,19 @@ aux_cm = newcmp.resampled(10000)
 newcolors = aux_cm(np.linspace(0, 1, 10000))
 cmap_ii_white = ListedColormap(newcolors)
 
+gray_shade = 0.90
+cdict = {'red':   [[0.0,  color_fam[0], color_fam[0]],
+                   [0.5,  gray_shade, gray_shade],
+                   [1.0,  color_nov[0], color_nov[0]]],
+         'green': [[0.0,  color_fam[1],color_fam[1]],
+                   [0.5, gray_shade, gray_shade],
+                   [1.0,  color_nov[1], color_nov[1]]],
+         'blue':  [[0.0,  color_fam[2], color_fam[2]],
+                   [0.5,  gray_shade, gray_shade],
+                   [1.0,  color_nov[2], color_nov[2]]]}
+cmp_vis = LinearSegmentedColormap('testCmap', segmentdata=cdict, N=256)
+
+
 ### General functions for loading data, selecting stable rules
 
 def load_and_merge(save_dir, paths):
@@ -216,6 +233,32 @@ def get_ind_stable(data):
     cond_all = np.logical_and(np.logical_and(np.logical_and(cond_rate,cond_cv), cond_wf), cond_wb)
     print(np.sum(cond_all),"/",len(data), "rules fulfill all conditions", np.sum(cond_all)/len(data)*100,"%")
     return(cond_all)
+
+def get_ind_stable_pd(data):
+    cond_rates = np.all([[r>=0.1 for r in rs] for rs in data['rate']], axis=1)
+    print('rates', np.sum(cond_rates),'/',len(cond_rates))
+
+    cond_cvs = np.all([[cv>=0.7 for cv in cvs] for cvs in data['cv_isi']], axis=1)
+    print('cv_isi', np.sum(cond_cvs),'/',len(cond_cvs))
+
+    cond_weef = np.all([[wee<=0.5 for wee in wees] for wees in data['weef']], axis=1)
+    print('weef', np.sum(cond_weef),'/',len(cond_weef))
+
+    cond_weif = np.all([[wei<=0.5 for wei in weis] for weis in data['weif']], axis=1)
+    print('weif', np.sum(cond_weif),'/',len(cond_weif))
+
+    cond_wief = np.all([[wie<=5 for wie in wies] for wies in data['wief']], axis=1)
+    print('wief', np.sum(cond_wief),'/',len(cond_wief))
+
+    cond_wiif = np.all([[wii<=5 for wii in wiis] for wiis in data['wiif']], axis=1)
+    print('wiif', np.sum(cond_wiif),'/',len(cond_wiif))
+
+    cond_wb = np.array([wblows[-1]<=0.1 for wblows in data['w_blow']])
+    print('w_blow', np.sum(cond_wb),'/',len(cond_wb))
+
+    inds_stability_tot = np.logical_and(np.logical_and(np.logical_and(cond_rates, cond_cvs), np.logical_and(cond_weef, cond_weif)),np.logical_and(np.logical_and(cond_wief, cond_wiif),cond_wb))
+    print(np.sum(inds_stability_tot),"/",len(data), "rules fulfill all conditions", np.sum(inds_stability_tot)/len(data)*100,"%")
+    return(inds_stability_tot)
 
 def get_ind_stable_MLP(data):
     # rates [0.5, 50]Hz for all break durations
@@ -328,6 +371,7 @@ def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=256):
         cmap(np.linspace(minval, maxval, n))
     )
     return new_cmap
+
 
 ### General plotting
 
@@ -627,7 +671,7 @@ def plot_4_rules(thetas,
     plt.subplots_adjust(wspace=0.2, hspace=0)
     if save_fig:
         plt.savefig(path, transparent=True)
-    fig.show()
+    plt.show()
 
 def plot_4_rules_histogram(dws_hist_ee,
                            dws_hist_ei,
@@ -956,6 +1000,338 @@ def plot_raster_w_engrams_sep_background(sts, neuron_labels=None, n_recorded=Non
 
     return
 
+def plot_significance_2t_1metric(data1_dict, data2_dict,
+                    xlabel, ylabel,
+                        font = "Arial", 
+                        fontsize = 10, 
+                        linewidth = 1.5, 
+                        xlim = None, 
+                        ylim = None,
+                        figsize=(1.5, 1),
+                        xticks=None,
+                        yticks=None,
+                        xhandlepad=None,
+                        yhandlepad=None,
+                        s=1, #can be a list too for group specific sizes
+                        edgecolors=None, #can be a list too for group specific sizes
+                        linewidth_marker=0.0, #can be a list too for group specific sizes
+                        center_axes = False,
+                        dpi=600,
+                        colors='black', #can be a list too for group specific sizes, 'none' for hollow
+                        color_xlabel="black",
+                        color_ylabel="black",
+                        marker='o', #can be a list too for group specific sizes
+                        linewidth_line=1.5,
+                        color_line="black",
+                        alpha_line=0.5,
+                        xticklabels=None,
+                        yticklabels=None,
+                        zorder_line=0.1,
+                        which_line = "all",
+                        labels=["plastic","static"],
+                        bbox_to_anchor=(1,1),
+                        labelspacing=1,
+                        handletextpad=0):
+
+    fig = plt.figure(figsize=figsize, dpi=dpi)
+    ax = plt.subplot()
+
+    n_data = len(data1_dict.keys())
+    print(n_data)
+
+    if not isinstance(s, list):
+        s = [s for i in range(n_data)]
+    if not isinstance(edgecolors, list):
+        edgecolors = [edgecolors for i in range(n_data)]
+    if not isinstance(linewidth_marker, list):
+        linewidth_marker = [linewidth_marker for i in range(n_data)]
+    if not isinstance(marker, list):
+        marker = [marker for i in range(n_data)]
+    if not isinstance(colors, list):
+        colors = [colors for i in range(n_data)]
+    
+    
+    img = ax.scatter(data1_dict['0'], data2_dict['0'], s=s[0], 
+                     marker=marker[0], edgecolors=edgecolors[0], 
+                     facecolors=colors[0], linewidths=linewidth_marker[0], zorder=10, label=labels[0])
+
+    for ind in range(1, n_data):
+        img = ax.scatter(data1_dict[str(ind)], data2_dict[str(ind)], s=s[ind], 
+                         marker=marker[ind], edgecolors=edgecolors[ind], 
+                     facecolors=colors[ind], linewidths=linewidth_marker[ind], zorder=10, label=labels[ind])
+        
+    if (xlim is not None) and (ylim is not None):
+        start=min(xlim[0], ylim[0])
+        stop=max(xlim[1], ylim[1])
+
+    if which_line == "all" or which_line == "diag":
+        ax.plot([start, stop], [start, stop], linestyle="--",linewidth=linewidth_line, color=color_line, alpha=alpha_line,zorder=zorder_line)
+
+    if which_line == "all" or which_line == "vh":
+        ax.plot([1, 1], [start, stop], linestyle="--",linewidth=linewidth_line, color=color_line, alpha=alpha_line,zorder=zorder_line)
+        ax.plot([start, stop], [1, 1], linestyle="--",linewidth=linewidth_line, color=color_line, alpha=alpha_line,zorder=zorder_line)
+
+    if xhandlepad != None:
+        ax.set_xlabel(xlabel, fontname=font, fontsize=fontsize, labelpad=xhandlepad)
+    else:
+        ax.set_xlabel(xlabel, fontname=font, fontsize=fontsize)
+        
+    if yhandlepad != None:
+        ax.set_ylabel(ylabel, fontname=font, fontsize=fontsize, labelpad=yhandlepad)
+    else:
+        ax.set_ylabel(ylabel, fontname=font, fontsize=fontsize)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(linewidth)
+    ax.spines['left'].set_linewidth(linewidth)
+    ax.tick_params(width=linewidth, labelsize=fontsize, length=2*linewidth, pad=2)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    if xlim != None:
+        ax.set_xlim(xlim)
+    if ylim != None:
+        ax.set_ylim(ylim)
+    if xticks != None:
+        ax.set_xticks(xticks)
+    if xticklabels != None:
+        ax.set_xticklabels(xticklabels)
+    if yticks != None:
+        ax.set_yticks(yticks)
+    if yticklabels != None:
+        ax.set_yticklabels(yticklabels)
+    if center_axes:
+        ax.spines['left'].set_position(('data', 0))
+        ax.spines['bottom'].set_position(('data', 0))
+    ax.xaxis.label.set_color(color_xlabel)
+    ax.yaxis.label.set_color(color_ylabel)
+
+    ax.legend(loc='upper left', bbox_to_anchor=bbox_to_anchor, fontsize=fontsize, ncol=1, frameon=False,
+                 borderpad=0, labelspacing=labelspacing, handlelength=0.5, columnspacing=1,
+                 handletextpad=handletextpad, borderaxespad=0.6, markerscale=3)
+
+def plot_fraction_significant_rules(prop, figsize=(1,1), dpi=600, x_lim=None, x_ticks=None, x_ticklabels=None,
+                                   x_label=None, y_lim=None, y_ticks=None, y_ticklabels=None, y_label=None,
+                                   axwidth=1.5, linewidth=1.5, xticks_pad=5, yticks_pad=0, labelpad_xlabel=5,
+                                   labelpad_ylabel=0, color='black', fontsize=10, font='Arial'):
+
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    ax.plot(prop, linewidth=linewidth, color=color, clip_on=False)
+
+    if x_lim is not None:
+        ax.set_xlim(x_lim)
+    if x_ticks is not None:
+        ax.set_xticks(x_ticks)
+    if x_ticklabels is not None:
+        ax.set_xticklabels(x_ticklabels)
+    if x_label is not None:
+        ax.set_xlabel(x_label, fontsize=fontsize, fontname=font, labelpad = labelpad_xlabel)
+
+    if y_lim is not None:
+        ax.set_ylim([y_lim[0], y_lim[1]])
+        ax.set_yticks([y_lim[0], y_lim[1]])
+    if y_ticks is not None:
+        ax.set_yticks(y_ticks)
+    else:
+        ax.set_yticks([])
+    if y_ticklabels is not None:
+        ax.set_yticklabels(y_ticklabels)
+    if y_label is not None:
+        ax.set_ylabel(y_label, fontsize=fontsize, fontname=font, labelpad = labelpad_ylabel)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+
+    ax.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    plt.show()
+
+def plot_raster(sts, neuron_indices, t_lim=None, fontsize=10, color="black", x_label="", y_label="", markersize=0.05, 
+figsize=(20, 3), font="arial", ax=None, x_ticks=None, x_ticklabels=None, y_ticks=None, y_ticklabels=None, tickwidth=2,
+axwidth=3, dpi=200, ylabel_xloc=-0.1, ylabel_yloc=0.15, xlabel_xloc=0.4, xlabel_yloc=-0.1, x_milestones=None, linewidth_milestones=1.5, alpha_milestone=1, zorder_milestone=1):
+    n_to_plot = len(neuron_indices)
+    if ax == None:
+        fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    if x_milestones is not None:
+        for x in x_milestones:
+            ax.axvline(x=x, ymin=0, ymax=1, linestyle=(0, (2, 1)), color="black", linewidth=linewidth_milestones,alpha=alpha_milestone, zorder=zorder_milestone)
+    ct = 0
+    for neuron_num in neuron_indices:
+        ax.scatter(sts[str(neuron_num)], np.full(len(sts[str(neuron_num)]), ct), linewidths=0, color=color, s=markersize, edgecolors=None, marker='o')
+        ct += 1
+    if t_lim is not None:
+        ax.set_xlim([t_lim[0], t_lim[1]])
+    if (t_lim is None) and (x_ticks is not None):
+        ax.set_xlim([x_ticks[0], x_ticks[-1]])
+    if x_ticks is None:
+        ax.set_xticks([t_lim[0], t_lim[1]])
+    else:
+        ax.set_xticks(x_ticks)
+    if x_ticklabels is not None:
+        ax.set_xticklabels(x_ticklabels)
+
+    if x_label is not None:
+        ax.plot((0.45, 0.55), (-0.05, -0.05), transform=ax.transAxes, color="black", clip_on=False, linewidth=axwidth)
+        fig.text(xlabel_xloc, xlabel_yloc, x_label, fontsize=fontsize, fontname=font, ha='center')
+
+    if y_label is not None:
+        ax.plot((-0.05, -0.05), (0.45, 0.55), transform=ax.transAxes, color="black", clip_on=False, linewidth=axwidth)
+        fig.text(ylabel_xloc, ylabel_yloc, y_label, fontsize=fontsize, fontname=font, rotation=90, ha='center')
+
+    ax.set_ylim([-1, n_to_plot + 0.1])
+    if y_ticks is None:
+        ax.set_yticks([0, n_to_plot])
+    else:
+        ax.set_yticks(y_ticks)
+    if y_ticklabels is not None:
+        ax.set_yticklabels(y_ticklabels)
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.tick_params(width=tickwidth, labelsize=fontsize, length=tickwidth*2, pad = 10)
+    ax.tick_params(axis='y', pad = 0)
+    return(ax)
+
+def plot_weights(w1=None, w2=None, ts=None, t_start=None, t_stop=None,
+                axwidth=1.5, linewidth=1.5, n_to_plot_weights=100,
+                fontsize=10, figsize=(1, 1), font = "arial", x_milestones=None, linewidth_milestones=1.5, alpha_milestone=1,
+                color1=None, color2=None, label1=None, label2=None, ylog=False,
+                x_ticks=None, x_ticklabels=None, x_label=None, alpha_w=None,  xlim=None,
+                linewidth_weights=0.5,
+                y_ticks=None, y_ticklabels=None, y_lim=None,
+                dpi=600):
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    if ylog:
+        ax.set_yscale('log')
+    for syn_num in range(n_to_plot_weights):
+        ax.plot(ts, w1[syn_num, :], color=color1, linewidth=linewidth_weights, alpha=alpha_w)
+        ax.plot(ts, w2[syn_num, :], color=color2, linewidth=linewidth_weights, alpha=alpha_w)
+    a4, =ax.plot(ts, np.mean(w1, axis=0), label=label1, color=color1, linewidth=linewidth, alpha=1)
+    a3, =ax.plot(ts, np.mean(w2, axis=0), label=label2, color=color2, linewidth=linewidth, alpha=1)
+    if x_milestones is not None:
+        for x in x_milestones:
+            ax.axvline(x=x, ymin=0, ymax=1, linestyle=(0, (2, 1)), color="black", linewidth=linewidth_milestones, zorder=1, alpha=alpha_milestone)
+    if xlim is None:
+        ax.set_xlim([t_start, t_stop])
+    else:
+        ax.set_xlim(xlim)
+    ax.set_ylim(y_lim)
+    ax.set_yticks(y_ticks)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+    ax.tick_params(width=axwidth, labelsize=fontsize, length=2*axwidth, pad=0.5)
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(x_ticklabels, fontsize=fontsize, fontname=font)
+    ax.set_yticklabels(y_ticklabels, fontsize=fontsize, fontname=font)
+    ax.tick_params(axis='x', which='minor', length=5*linewidth, color='black', width=linewidth, labelsize=fontsize, pad=10)
+    ax.set_xlabel(x_label, fontsize=fontsize, fontname=font, labelpad = 0)
+    leg = ax.legend(handles=[a3, a4], loc='upper center', bbox_to_anchor=(1.5, 1.5), fontsize=fontsize, ncol=1, frameon=False,
+                borderpad=0, labelspacing=0.1, handlelength=0.1, columnspacing=0.5, handletextpad=0.1)
+    plt.show()
+
+def plot_2Dhist_contour(list_data1, list_data2,
+                xlabel=None,
+                ylabel=None,
+                n_bins=100,
+                range_2Dhist=[[-0.5, 1.5], [-0.5, 1.5]],
+                font = "Arial", 
+                fontsize = 10, 
+                linewidth = 1.5, 
+                xlim = None, 
+                ylim = None,
+                figsize=(1.5, 1),
+                xticks=None,
+                yticks=None,
+                xhandlepad=None,
+                yhandlepad=None,
+                s=1,
+                center_axes = False,
+                dpi=600,
+                color='black',
+                color_xlabel="black",
+                color_ylabel="black",
+                marker='o',
+                linewidth_line=1.5,
+                color_line="black",
+                alpha_line=0.5,
+                xticklabels=None,
+                yticklabels=None,
+                zorder_line=0.1,
+                colors=None,
+                axwidth=1.5,
+                bbox_to_anchor=(0.98, 0.9),
+                level=3,
+                gaussian_filt_sigma=0.71,
+                labels_data=None):
+    
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    n_data = len(list_data1)
+    for i in range(n_data):
+        H, xedges, yedges = np.histogram2d(list_data1[i], list_data2[i], bins=n_bins, range=range_2Dhist, density=True, weights=None)
+        
+        ax.contour(xedges[:-1], yedges[:-1], gaussian_filter(H.T, gaussian_filt_sigma), [level], 
+                   colors=[colors[i]], linewidths=linewidth)
+    ax.plot(range_2Dhist[0], range_2Dhist[1], linestyle="--",linewidth=linewidth_line, color=color_line, alpha=alpha_line,zorder=zorder_line)
+    ax.plot(range_2Dhist[0], [0,0], linestyle="--",linewidth=linewidth_line, color=color_line, alpha=alpha_line,zorder=zorder_line)
+    ax.plot([0,0], range_2Dhist[1], linestyle="--",linewidth=linewidth_line, color=color_line, alpha=alpha_line,zorder=zorder_line)
+
+
+    if xhandlepad != None:
+        ax.set_xlabel(xlabel, fontname=font, fontsize=fontsize, labelpad=xhandlepad)
+    else:
+        ax.set_xlabel(xlabel, fontname=font, fontsize=fontsize)
+        
+    if yhandlepad != None:
+        ax.set_ylabel(ylabel, fontname=font, fontsize=fontsize, labelpad=yhandlepad)
+    else:
+        ax.set_ylabel(ylabel, fontname=font, fontsize=fontsize)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+    ax.tick_params(width=axwidth, labelsize=fontsize, length=2*axwidth)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    if xlim != None:
+        ax.set_xlim(xlim)
+    if ylim != None:
+        ax.set_ylim(ylim)
+    if xticks != None:
+        ax.set_xticks(xticks)
+    if xticklabels != None:
+        ax.set_xticklabels(xticklabels)
+    if yticks != None:
+        ax.set_yticks(yticks)
+    if yticklabels != None:
+        ax.set_yticklabels(yticklabels)
+    if center_axes:
+        ax.spines['left'].set_position(('data', 0))
+        ax.spines['bottom'].set_position(('data', 0))
+    ax.xaxis.label.set_color(color_xlabel)
+    ax.yaxis.label.set_color(color_ylabel)
+
+    proxy = [plt.Rectangle((0,0),1,1,fc = color) for color in colors] 
+
+    legend = ax.legend(proxy, labels_data, loc='upper left', bbox_to_anchor=bbox_to_anchor, 
+              fontsize=fontsize, ncol=1, frameon=False,
+              borderpad=0, labelspacing=0.5, handlelength=1, 
+              columnspacing=0, handletextpad=0.3, borderaxespad=0.6)
+    
+    plt.show()
+
 ### Successor representation task
 
 def compute_succ(n_tot=None, n_bins=None, test_starts=None, ontime_test=None, offtime_test=None,
@@ -1226,6 +1602,7 @@ def get_r_rest(n_tot, n_bins, test_starts, ontime_test, offtime_test, raw_r_rest
                 r_rest[:,test_num,0,presented_stim_num] = np.mean(raw_r_rest[:,test_num,inds_single_stim[presented_stim_num]], axis=1)
         return(r_rest)
 
+
 ### Contextual novelty task
 
 def get_dr_stfam(n_bins=None,
@@ -1271,7 +1648,8 @@ def get_inds_last_el_sequence_stim_pres(n_bins, test_starts, ontime_test, offtim
             start += 1
     return(inds_seq_stim)   
 
-####### Replay
+
+####### Replay analysis
 
 def get_rhos_1tbreak_1rule(eng_rates, rule_ind, break_ind, n_fam=5, n_nov=2):
     nov_rates_av = np.mean(eng_rates[rule_ind, break_ind, :n_nov, :], axis=0) + 0.1
@@ -1341,7 +1719,8 @@ def plot_replay_metrics_1rule(rhos_max_av, rhos_spec_av, ts_max, axwidth=1.5, li
     
     plt.show()
 
-### Spiking network analysis, compute engrams
+
+### Spiking network analysis, computing engrams
 
 def get_eng_rate(spiketimes, test_starts, l_pre_test_record, l_1test, bin_size_big, n_tests, n_recorded, n_tot_stim, engrams):
     binned_spikes_big = get_binned_spikes_big(spiketimes, test_starts, l_pre_test_record, l_1test, bin_size_big, n_tests, n_recorded)
@@ -1531,4 +1910,492 @@ def get_individual_rates_npy(start, stop, spiketimes, n_recorded):
         rates[neuron] =  np.sum(np.logical_and(start<=spiketimes[str(neuron)], 
                                             spiketimes[str(neuron)]<=stop))/(stop-start)
     return(rates)
+
+
+### Allen data analysis
+
+def get_dr_perAnimal_1region(h5_path):
+    with h5py.File(h5_path, "r") as f:
+        keys = list(f.keys())
+        n_keys = len(keys)
+        mdr_perAnimal = np.zeros(n_keys)
+        print('number of sessions (animals):', n_keys)
+        for i, k in enumerate(keys):
+            mean_fam_1region_per_cell = np.nanmean(f[k]['familiar'], axis=0)
+            mean_nov_1region_per_cell = np.nanmean(f[k]['novel'], axis=0)
+            dr_1region_per_cell = 2*(mean_nov_1region_per_cell - mean_fam_1region_per_cell) / (mean_nov_1region_per_cell + mean_fam_1region_per_cell+0.01)
+            mdr_perAnimal[i] = np.mean(dr_1region_per_cell)
+    return mdr_perAnimal
+
+
+### Synaptic data comparison
+
+def get_dw(rule_params, dt_values):
+    tau_pre = rule_params[0]
+    tau_post = rule_params[1]
+    alpha = rule_params[2]
+    beta = rule_params[3]
+    gamma = rule_params[4]
+    kappa = rule_params[5]
+    dw_values = np.zeros(len(dt_values))
+    for dt in range(len(dt_values)):
+        if dt_values[dt] > 0:
+            dw_values[dt] = alpha + beta + gamma * np.exp(-dt_values[dt]/tau_pre)
+        else:
+            dw_values[dt] = alpha + beta + kappa * np.exp(dt_values[dt]/tau_post)
+    return dw_values
+
+def plot_4_rules_wData(thetas,
+                n_bins=1000,
+                x_lim=[-0.2,0.2],
+                y_lim = [-1,1],
+                x_datapoints = [],
+                y_datapoints = [],
+                ind_plot_datapoint = 0,
+                markersize_datapoints = 1,
+                linewidth_data_marker=0.4,
+                y_ticks=[],
+                x_ticks=[],
+                x_ticklabels=None,
+                x_label=r'$\Delta t$',
+                y_label=r'$\Delta w$',
+                color_ee=(165/256,42/256,42/256),
+                color_ei=(242/256, 140/256, 40/256),
+                color_ie=(8/256, 143/256, 143/256),
+                color_ii=(47/256, 85/256, 151/256),
+                color_ylabel="black",
+                figsize=(0.6,0.1),
+                labelpad_xlabel=1,
+                fontsize=10,
+                labelpad_ylabel=27,
+                linewidth=0.8,
+                axwidth=0.8,
+                dpi=600,
+                xticks_pad=0,
+                yticks_pad=0,
+                rotation=0,
+                font='arial',
+                y_ticklabels=None,
+                color_data='black'):
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1,4,figsize=figsize, dpi=dpi, gridspec_kw={'width_ratios': [1, 1, 1, 1]})
+
+    ts = np.linspace(x_lim[0], x_lim[1],num=n_bins)
+    ind_t_pos = 0
+    while ts[ind_t_pos] < 0:
+        ind_t_pos += 1
+
+    for theta_num in range(len(thetas)):
+        dws = np.array([thetas[theta_num, 2] + thetas[theta_num, 3] + thetas[theta_num, 5]*np.exp(-np.abs(ts[i])/thetas[theta_num, 1]) for i in range(ind_t_pos)])
+        dws = np.append(dws, np.array([thetas[theta_num, 2] + thetas[theta_num, 3] + thetas[theta_num, 4]*np.exp(-np.abs(ts[i])/thetas[theta_num, 0]) for i in range(ind_t_pos, len(ts))]), axis=0)
+        dws = dws / np.max(np.abs(dws))
+        line1_1, = ax1.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ee, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line1_2, = ax1.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ee, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line1_1.set_solid_capstyle('round')
+        line1_2.set_solid_capstyle('round')
+    ax1.set_xlim(x_lim)
+    ax1.set_xticks(x_ticks)
+    ax1.set_ylim([-1, 1])
+    ax1.set_yticks(y_ticks)
+    ax1.set_xticklabels(x_ticklabels)
+    ax1.set_yticklabels(y_ticklabels)
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(axwidth)
+    ax1.spines['left'].set_linewidth(axwidth)
+    ax1.spines['bottom'].set_position('zero')
+    ax1.spines['left'].set_position('zero')
+    ax1.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax1.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    for theta_num in range(len(thetas)):
+        dws = np.array([thetas[theta_num, 2+6] + thetas[theta_num, 3+6] + thetas[theta_num, 5+6]*np.exp(-np.abs(ts[i])/thetas[theta_num, 1+6]) for i in range(ind_t_pos)])
+        dws = np.append(dws, np.array([thetas[theta_num, 2+6] + thetas[theta_num, 3+6] + thetas[theta_num, 4+6]*np.exp(-np.abs(ts[i])/thetas[theta_num, 0+6]) for i in range(ind_t_pos, len(ts))]), axis=0)
+        dws = dws / np.max(np.abs(dws))
+        line2_1, = ax2.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ei, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line2_2, = ax2.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ei, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line2_1.set_solid_capstyle('round')
+        line2_2.set_solid_capstyle('round')
+    ax2.set_xlim(x_lim)
+    ax2.set_xticks(x_ticks)
+    ax2.set_ylim([-1, 1])
+    ax2.set_yticks(y_ticks)
+    ax2.set_xticklabels(x_ticklabels)
+    ax2.set_yticklabels(y_ticklabels)
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['bottom'].set_linewidth(axwidth)
+    ax2.spines['left'].set_linewidth(axwidth)
+    ax2.spines['bottom'].set_position('zero')
+    ax2.spines['left'].set_position('zero')
+    ax2.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax2.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    for theta_num in range(len(thetas)):
+        dws = np.array([thetas[theta_num, 2+2*6] + thetas[theta_num, 3+2*6] + thetas[theta_num, 5+2*6]*np.exp(-np.abs(ts[i])/thetas[theta_num, 1+2*6]) for i in range(ind_t_pos)])
+        dws = np.append(dws, np.array([thetas[theta_num, 2+2*6] + thetas[theta_num, 3+2*6] + thetas[theta_num, 4+2*6]*np.exp(-np.abs(ts[i])/thetas[theta_num, 0+2*6]) for i in range(ind_t_pos, len(ts))]), axis=0)
+        dws = dws / np.max(np.abs(dws))
+        line3_1, = ax3.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ie, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line3_2, = ax3.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ie, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line3_1.set_solid_capstyle('round')
+        line3_2.set_solid_capstyle('round')
+    ax3.set_xlim(x_lim)
+    ax3.set_xticks(x_ticks)
+    ax3.set_ylim([-1, 1])
+    ax3.set_yticks(y_ticks)
+    ax3.set_xticklabels(x_ticklabels,)
+    ax3.set_yticklabels(y_ticklabels)
+    ax3.spines['top'].set_visible(False)
+    ax3.spines['right'].set_visible(False)
+    ax3.spines['bottom'].set_linewidth(axwidth)
+    ax3.spines['left'].set_linewidth(axwidth)
+    ax3.spines['bottom'].set_position('zero')
+    ax3.spines['left'].set_position('zero')
+    ax3.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax3.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    line3_1.set_solid_capstyle('round')
+    line3_2.set_solid_capstyle('round')
+
+    for theta_num in range(len(thetas)):
+        dws = np.array([thetas[theta_num, 2+3*6] + thetas[theta_num, 3+3*6] + thetas[theta_num, 5+3*6]*np.exp(-np.abs(ts[i])/thetas[theta_num, 1+3*6]) for i in range(ind_t_pos)])
+        dws = np.append(dws, np.array([thetas[theta_num, 2+3*6] + thetas[theta_num, 3+3*6] + thetas[theta_num, 4+3*6]*np.exp(-np.abs(ts[i])/thetas[theta_num, 0+3*6]) for i in range(ind_t_pos, len(ts))]), axis=0)
+        dws = dws / np.max(np.abs(dws))
+        line4_1, = ax4.plot(ts[:n_bins//2], dws[:n_bins//2], color=color_ii, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line4_2, = ax4.plot(ts[n_bins//2:], dws[n_bins//2:], color=color_ii, linewidth=linewidth, clip_on = False, zorder=0.1)
+        line4_1.set_solid_capstyle('round')
+        line4_2.set_solid_capstyle('round')
+    ax4.set_xlim(x_lim)
+    ax4.set_xticks(x_ticks)
+    ax4.set_ylim([-1, 1])
+    ax4.set_yticks(y_ticks)
+    ax4.set_xticklabels(x_ticklabels)
+    ax4.set_yticklabels(y_ticklabels)
+    ax4.spines['top'].set_visible(False)
+    ax4.spines['right'].set_visible(False)
+    ax4.spines['bottom'].set_linewidth(axwidth)
+    ax4.spines['left'].set_linewidth(axwidth)
+    ax4.spines['bottom'].set_position('zero')
+    ax4.spines['left'].set_position('center')
+    ax4.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax4.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    line4_1.set_solid_capstyle('round')
+    line4_2.set_solid_capstyle('round')
+
+    if ind_plot_datapoint == 0:
+        chosen_ax = ax1
+    elif ind_plot_datapoint == 1:
+        chosen_ax = ax2
+    elif ind_plot_datapoint == 2:
+        chosen_ax = ax3
+    elif ind_plot_datapoint == 3:
+        chosen_ax = ax4
+    chosen_ax.scatter(x_datapoints, y_datapoints, color=color_data, s=markersize_datapoints, zorder=10, marker='.', edgecolor='black', linewidth=linewidth_data_marker, clip_on = False)
+    plt.subplots_adjust(wspace=0.2, hspace=0)
+    plt.show()
+
+def plot_distance_distribution(
+        data_1D=None,
+        dpi=600,
+        n_bins=None, 
+        range = None,
+        log_scale=False,
+        x_lim=None,
+        x_ticks=None,
+        x_ticklabels=None,
+        labelpad_xlabel=1,
+        x_label=None,
+        y_lim=None,
+        y_ticks=None,
+        y_ticklabels=None,
+        labelpad_ylabel=1,
+        y_label=None, 
+        figsize=(2,1),
+        linewidth=1,
+        title=None,
+        fontsize=10,
+        font="arial",
+        color='black',
+        rotation=45):
+    
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    hist, bins = np.histogram(data_1D, bins=n_bins, density=False, range=range)
+    line1, = ax.plot(bins[1:], hist, color=color, linewidth=linewidth)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(linewidth)
+    ax.spines['left'].set_linewidth(linewidth)
+    ax.tick_params(width=linewidth, labelsize=fontsize, length=2*linewidth)
+    ax.minorticks_off()
+    
+    if log_scale:
+        ax.set_yscale('log')
+    if x_lim is not None:
+        ax.set_xlim([x_lim[0], x_lim[1]])
+        ax.set_xticks([x_lim[0], x_lim[1]])
+    if x_ticks is not None:
+        ax.set_xticks(x_ticks)
+    if x_ticklabels is not None:
+        ax.set_xticklabels(x_ticklabels, rotation = rotation)
+    if x_label is not None:
+        ax.set_xlabel(x_label, fontsize=fontsize, fontname=font, labelpad = labelpad_xlabel)
+    if title is not None:
+        ax.set_title(label=title, fontsize=fontsize*1.2)
+    
+    if y_lim is not None:
+        ax.set_ylim([y_lim[0], y_lim[1]])
+        ax.set_yticks([y_lim[0], y_lim[1]])
+    if y_ticks is not None:
+        ax.set_yticks(y_ticks)
+    if y_ticklabels is not None:
+        ax.set_yticklabels(y_ticklabels)
+    if y_label is not None:
+        ax.set_ylabel(y_label, fontname=font, fontsize=fontsize, labelpad = labelpad_ylabel)
+
+    plt.show()
+
+def plot_spider_meandiffs(
+        mean1,
+        mean2,
+        labels = np.array([r'$\tau_{pre}$', r'$\tau_{post}$', r'$\alpha$', r'$\beta$', r'$\gamma$', r'$\kappa$']),
+        color_fill = 'black',
+        color_mean = 'blue',
+        figsize = (0.8,0.8),
+        axwidth = 1,
+        linewidth=1,
+        fontsize=10,
+        start_draw = 1.5,
+        y_lim = [-3,2]):
+    
+    # because polar plot, loop end on start
+    stats_mean1 = np.concatenate((mean1,[mean1[0]]))
+    stats_mean2 = np.concatenate((mean2,[mean2[0]]))
+
+    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False)
+    angles = np.concatenate((angles,[angles[0]]))
+
+    fig = plt.figure(figsize=figsize, dpi=600)
+    ax = fig.add_subplot(111, polar=True)
+
+    ax.plot(angles, stats_mean1, '-', color=color_mean, linewidth=linewidth, alpha=1, zorder=11)
+    ax.plot(angles, stats_mean2, '-', color=color_fill, linewidth=linewidth, alpha=1, zorder=10.5)
+    ax.fill_between(angles, stats_mean2, stats_mean1, color=color_fill, alpha=1, zorder=10, linewidth=0)
+
+    ax.grid(False)
+    hex_radii = [0] #[-2,0,2]
+    for r in hex_radii:
+        ax.plot(
+            angles,
+            np.full_like(angles, r),
+            color='black',
+            linewidth=0.8,
+            zorder=0,
+            linestyle = (0, (2, 1)),
+            alpha=1
+        )
+
+    for angle in angles[:-1]:
+        ax.plot(
+            [angle, angle],
+            [start_draw, y_lim[1]],
+            color='black',
+            linewidth=axwidth,
+            zorder=1,
+        )
+    
+    ax.scatter([0], y_lim[0], color='black', s=1, zorder=20)
+
+    ax.spines['polar'].set_visible(False)
+    ax.set_thetagrids(angles * 180/np.pi, np.concatenate((labels,[labels[0]])))
+    plt.yticks([0],[""],color="black", size=fontsize)
+    plt.ylim(y_lim)
+    plt.show()
+
+def plot_4spider_plots(d, sorted_inds):
+    for chosen_con in ['ee', 'ei', 'ie', 'ii']:
+        if chosen_con == 'ee':
+            color = color_ee
+            start_ind = 0
+            end_ind = 6
+        elif chosen_con == 'ei':
+            color = color_ei
+            start_ind = 6
+            end_ind = 12
+        elif chosen_con == 'ie':
+            color = color_ie
+            start_ind = 12
+            end_ind = 18
+        elif chosen_con == 'ii':
+            color = color_ii
+            start_ind = 18
+            end_ind = 24
+
+        y_lim = [-1.6,1.8]
+
+        all_rules = np.array(d['theta'][:, start_ind:end_ind])
+        all_rules[:,0] = (all_rules[:,0]-0.01)/(0.1 - 0.01)*y_lim[1]
+        all_rules[:,1] = (all_rules[:,1]-0.01)/(0.1 - 0.01)*y_lim[1]
+        mean_all_rules = np.mean(all_rules, axis=0)
+        std_all_rules = np.std(all_rules, axis=0)
+
+        n_rules_to_analyse = 10
+        rules_selected = np.array(d[sorted_inds[:n_rules_to_analyse]]['theta'][:,start_ind:end_ind])
+        rules_selected[:,0] = (rules_selected[:,0]-0.01)/(0.1 - 0.01)*y_lim[1]
+        rules_selected[:,1] = (rules_selected[:,1]-0.01)/(0.1 - 0.01)*y_lim[1]
+        mean_rules_selected = np.mean(rules_selected, axis=0)
+        std_rules_selected = np.std(rules_selected, axis=0)
+
+        plot_spider_meandiffs(
+            mean_all_rules,
+            mean_rules_selected,
+            color_fill = color,
+            color_mean = color,
+            figsize = (0.95,0.95),
+            axwidth = 1,
+            linewidth = 0.8,
+            y_lim = y_lim,
+            start_draw = 1.4,
+        )
+
+def plot_drmem_comparison(dr, n_good_rules, sorted_inds, marker_size_circ = 6, elinewidth_small = 1.5, markeredgewidth = 0.5,
+                          labels = [r'$10s$', r'$4h$'], figsize = (0.6, 0.7), dpi=600, axwidth = 1.5, fontsize = 10):
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    n_rules_to_analyse = max(10, n_good_rules)
+
+    eb0 = ax.errorbar([0.1, 1.1], [np.mean(dr[:,2]), np.mean(dr[:,-1])], [np.std(dr[:,2]), np.std(dr[:,-1])],
+                linestyle='', marker='.', ms=marker_size_circ, color='grey', zorder=10, markeredgecolor='black', markeredgewidth=markeredgewidth, elinewidth=elinewidth_small)
+    eb1 = ax.errorbar([-0.1, 0.9],
+                    [np.mean(dr[sorted_inds[:n_rules_to_analyse]][:,2]), np.mean(dr[sorted_inds[:n_rules_to_analyse]][:,-1])],
+                    [np.std(dr[sorted_inds[:n_rules_to_analyse]][:,2]), np.std(dr[sorted_inds[:n_rules_to_analyse]][:,-1])],
+                    linestyle='', marker='.', ms=marker_size_circ, color='#36454F', zorder=10, markeredgecolor='black', markeredgewidth=markeredgewidth, elinewidth=elinewidth_small)
+    for line in eb1[2]:
+        line.set_path_effects([pe.Stroke(linewidth=1.5*elinewidth_small, foreground='black'),pe.Normal()])
+    for line in eb0[2]:
+        line.set_path_effects([pe.Stroke(linewidth=1.5*elinewidth_small, foreground='black'),pe.Normal()])
+    # add legend
+    ax.legend([eb1, eb0], ['Selected rules', 'All rules'], fontsize=fontsize-2, frameon=False, handletextpad=0.5, labelspacing=0.2, handlelength=1)
+    # change location of legend
+    legend = ax.get_legend()
+    legend.set_bbox_to_anchor((0.5, 1.15))
+
+    ax.set_xlim([-0.4,1.3])
+    ax.set_xticks([0,1])
+    ax.set_yticks([-0.4, 0, 0.4])
+    ax.set_yticklabels([-0.4, 0, 0.4])
+    ax.set_xticklabels(labels, fontsize=fontsize)
+    ax.set_ylabel('A.U.', fontsize=fontsize, labelpad=-13)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+    ax.tick_params(width=axwidth, labelsize=fontsize, length=2*axwidth)
+    plt.show()
+
+def plot_rbg_comparison(d, n_good_rules, sorted_inds, labels = [r'$r_{bg}$'], chosen_time_index = -1, figsize = (0.2, 0.7),
+                        dpi=600, axwidth=1, linewidth=1, marker_size_circ = 6, markeredgewidth = 0.5, elinewidth_small = 1.5,
+                        fontsize = 10):
+    
+    n_rules_to_analyse = max(10, n_good_rules)
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    d[sorted_inds[:n_rules_to_analyse]]['rate']
+    eb0 = ax.errorbar([0.1], np.mean(d['rate'][:,chosen_time_index]), np.std(d['rate'][:,chosen_time_index]),
+        linestyle='', marker='.', ms=marker_size_circ, color='grey', zorder=10, markeredgecolor='black', markeredgewidth=markeredgewidth, elinewidth=elinewidth_small)
+    eb1 = ax.errorbar([-0.1], np.mean(d['rate'][sorted_inds[:n_rules_to_analyse]][:,chosen_time_index]), np.std(d['rate'][sorted_inds[:n_rules_to_analyse]][:,chosen_time_index]),
+                  linestyle='', marker='.', ms=marker_size_circ, color='#36454F', zorder=10, markeredgecolor='black', markeredgewidth=markeredgewidth, elinewidth=elinewidth_small)
+    for line in eb1[2]:
+        line.set_path_effects([pe.Stroke(linewidth=1.5*elinewidth_small, foreground='black'),pe.Normal()])
+    for line in eb0[2]:
+        line.set_path_effects([pe.Stroke(linewidth=1.5*elinewidth_small, foreground='black'),pe.Normal()])
+    ax.set_xlim([-0.2,0.2])
+    ax.set_xticks([0])
+    ax.set_yticks([0, 5])
+    ax.set_yticklabels([0, 5])
+    ax.set_xticklabels(labels, fontsize=fontsize)
+    ax.set_ylabel('Hz', fontsize=fontsize, labelpad=-8)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+    ax.tick_params(width=axwidth, labelsize=fontsize, length=2*axwidth)
+    plt.show()
+
+
+### Slice visualization
+
+def string_to_float_list(s):
+  if 'nan' in s:
+      return [np.nan] * s.count('nan')
+  else:
+      numbers = re.findall(r'[-+]?\d*\.\d+e[-+]?\d+|[-+]?\d*\.\d+|\d+', s)
+      return [float(num) for num in numbers]
+  
+def plot_rotated_points(rotated_x, rotated_y, dr, inds_stable, xlabel=None, ylabel=None, dpi=600, inds_rules_base=None,
+                        figsize=(1,1), xhandlepad=0, font='Arial', fontsize=10, yhandlepad=0, linewidth=1.5, xlim=None, ylim=None, xticks=None, yticks=None, 
+                        xticklabels=None, yticklabels=None, vmin=-1, vmax=1,
+                        marker_unstable='o', edgecolors_unstable = 'none', marker_size_unstable=0.1, facecolor_unstable='black', linewidths_unstable=0.1,
+                        marker_stable='o', edgecolors_stable = 'none', marker_size_stable=0.1, facecolor_stable='black', linewidths_stable=0.1,
+                        marker_base='o', edgecolors_base = 'none', marker_size_base=0.1, facecolor_base='black', linewidths_base=0.1,
+                        heatmap_label=None, cbarhandlepad=0, cbarticks=[], cbarticklabels=[],
+                        ):
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    ax.scatter(rotated_x[np.invert(inds_stable)], rotated_y[np.invert(inds_stable)], marker=marker_unstable, edgecolors=edgecolors_unstable, 
+                     facecolors=facecolor_unstable, linewidths=linewidths_unstable, s=marker_size_unstable)
+    
+    img = ax.scatter(rotated_x[inds_stable], rotated_y[inds_stable], c=dr[inds_stable], vmin=vmin, vmax=vmax, marker=marker_stable, edgecolors=edgecolors_stable, 
+                     facecolors=facecolor_stable, linewidths=linewidths_stable, s=marker_size_stable, cmap=cmp_vis)
+    
+    if inds_rules_base is not None:
+        ax.scatter(rotated_x[inds_rules_base], rotated_y[inds_rules_base], c=dr[inds_rules_base], vmin=vmin, vmax=vmax, marker=marker_base, edgecolors=edgecolors_base, 
+                     facecolors=facecolor_base, linewidths=linewidths_base, s=marker_size_base, cmap=cmp_vis)
+
+    if xhandlepad != None:
+        ax.set_xlabel(xlabel, fontname=font, fontsize=fontsize, labelpad=xhandlepad)
+    else:
+        ax.set_xlabel(xlabel, fontname=font, fontsize=fontsize)
+        
+    if yhandlepad != None:
+        ax.set_ylabel(ylabel, fontname=font, fontsize=fontsize, labelpad=yhandlepad)
+    else:
+        ax.set_ylabel(ylabel, fontname=font, fontsize=fontsize)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.tick_params(width=linewidth, labelsize=fontsize, length=2*linewidth, pad=2)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    if xlim != None:
+        ax.set_xlim(xlim)
+    if ylim != None:
+        ax.set_ylim(ylim)
+    if xticks != None:
+        ax.set_xticks(xticks)
+    if xticklabels != None:
+        ax.set_xticklabels(xticklabels)
+    if yticks != None:
+        ax.set_yticks(yticks)
+    if yticklabels != None:
+        ax.set_yticklabels(yticklabels)
+
+    cbar = fig.colorbar(img, label = heatmap_label, aspect=15, ax=ax)
+    cbar.outline.set_color('black')
+    cbar.outline.set_linewidth(linewidth)
+    cbar.ax.tick_params(labelsize=fontsize, width=linewidth, length=2*linewidth)
+    if cbarhandlepad != None:
+        cbar.set_label(label=heatmap_label, size=fontsize, labelpad=cbarhandlepad)
+    else:
+        cbar.set_label(label=heatmap_label, size=fontsize)
+    if cbarticks != None:
+        cbar.set_ticks(cbarticks)
+    if cbarticklabels is not None:
+        cbar.set_ticklabels(cbarticklabels)
+
+    plt.show()
+
+
+
 #
