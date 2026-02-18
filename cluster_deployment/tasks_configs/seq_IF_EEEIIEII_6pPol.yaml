@@ -1,0 +1,48 @@
+# auryn_sim_dir: "/home/bconfavr/Documents/synapsesbi/synapsbi/simulator/cpp_simulators/" #for workstation
+auryn_sim_dir: "/nfs/scistore23/vogelgrp/bconfavr/synapsesbi/synapsbi/simulator/cpp_simulators/" #for cluster
+# workdir: "/home/bconfavr/Documents/synapsesbi/synapsbi/simulator/cpp_simulators/sim_workdir" #for workstation
+workdir: "/mnt/beegfs/vogelgrp/bconfavr" #for cluster
+NE: 4096
+NI: 1024
+tau_ampa: 0.005
+tau_gaba: 0.01
+tau_nmda: 0.1
+ampa_nmda_ratio: 0.3
+wee: 0.1
+wei: 0.1
+wie: 1
+wii:  1
+wmax: 20
+sparseness: 0.1
+N_input: 11025 #pre 04/11/2024 7056, then 35721 (3*7*9)**2, 11025 (3*7*5)**2
+radius: 8
+active_input_rate: 100 #used to be 60, now 100 post 14/06
+rate_poisson: 10 # used again, it's NOT a nuisance parameters anymore
+weight_poisson: 0.075
+max_rate_checker: 100
+tau_checker: 1
+eta: 0.01 #0.01
+lpt: 30
+lt: 50 #was 10s now 50 cuz 5 stimuli...
+t_breaks: [1, 9,  10, 40, 60,  180, 300, 600,  2400, 10800] # actually does NOT determine what's run in cpp file (hard coded), but check should match
+ontime_train: 0.2 #used to be 0.1, now 0.2 post 14/06
+offtime_train: 0 #used to be 0.1, now 0 post 14/06
+ontime_test: 0.2 #used to be 0.1, now 0.2 post 14/06
+offtime_test: 2.8 #used to be 2.9, now 2.8 post 14/06
+name: "sim_seq_IF_EEEIIEII_6pPol"
+n_recorded: 4096
+record_i: True
+n_recorded_i: 500
+n_bins_kl_isi: 100
+isi_lim_kl_isi: [0,1]
+bin_size_small: 0.001
+bin_size_medium: 0.01
+bin_size_big: 0.1
+window_view_auto_cov: 0.5
+bin_size_fft: 0.01
+con_type: ["ee","ei","ie","ii"]
+n_dim_params: 25
+prior_params:
+  low_lim: -2.
+  up_lim: 2.
+  theta_dim: 25

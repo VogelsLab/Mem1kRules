@@ -1,0 +1,49 @@
+# auryn_sim_dir: "/home/bconfavr/Documents/synapsesbi/synapsbi/simulator/cpp_simulators/" #for workstation
+auryn_sim_dir: "/nfs/scistore23/vogelgrp/bconfavr/synapsesbi/synapsbi/simulator/cpp_simulators/" #for cluster
+# workdir: "/home/bconfavr/Documents/synapsesbi/synapsbi/simulator/cpp_simulators/sim_workdir" #for workstation
+workdir: "/mnt/beegfs/vogelgrp/bconfavr" #for cluster
+NE: 4096
+NI: 1024
+tau_ampa: 0.005
+tau_gaba: 0.01
+tau_nmda: 0.1
+ampa_nmda_ratio: 0.3
+wee: 0.1 # 0.1
+wei: 0.1 # 0.1
+wie: 1 # 2
+wii: 1 # 2
+wmax: 20
+sparseness: 0.1
+N_input: 10000
+radius: 8
+N_active_input: 500
+active_input_rate: 60 # 60
+rate_poisson: 10 # 10 used again, it's NOT a nuisance parameters anymore
+weight_poisson: 0.075
+max_rate_checker: 100
+tau_checker: 1
+eta: 0.01
+lpt: 30 #30
+lt: 10 #10
+t_breaks: [1, 9,  10, 40, 60,  180, 300, 600,  2400, 10800] # actually does NOT determine what's run in cpp file (hard coded), but check should match
+ontime_train: 1
+offtime_train: 0.01
+ontime_test: 1
+offtime_test: 3
+name: "sim_BND_IF_EEEIIEII_6pPol"
+n_recorded: 4096
+record_i: True
+n_recorded_i: 500
+n_bins_kl_isi: 100
+isi_lim_kl_isi: [0,1]
+bin_size_small: 0.001
+bin_size_medium: 0.01
+bin_size_big: 0.1
+window_view_auto_cov: 0.5
+bin_size_fft: 0.01
+con_type: ["ee","ei","ie","ii"]
+n_dim_params: 25
+prior_params:
+  low_lim: -2.
+  up_lim: 2.
+  theta_dim: 25

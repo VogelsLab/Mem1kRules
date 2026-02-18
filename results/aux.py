@@ -1,12 +1,17 @@
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.pyplot as plt
-import torch
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import h5py
 import matplotlib.patheffects as pe
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import h5py
 import re
 from scipy.ndimage import gaussian_filter
+import pandas as pd
+from sklearn.metrics import mean_squared_error
+
 
 ###  Define colors and colormaps of the paper
 
@@ -2397,5 +2402,854 @@ def plot_rotated_points(rotated_x, rotated_y, dr, inds_stable, xlabel=None, ylab
     plt.show()
 
 
+### Pong
 
-#
+class ReadoutModel(nn.Module):
+    def __init__(self, num_neurons: int, out_dim: int = 4):
+        super().__init__()
+        self.fc1 = nn.Linear(num_neurons, out_dim)
+
+    def forward(self, rates: torch.Tensor) -> torch.Tensor:
+        return self.fc1(rates)
+
+def _load_pong_csvs(ball_csv: str, fr_csv: str, game_index_csv: str):
+    df_ball = pd.read_csv(ball_csv)
+    ball_positions = torch.tensor(df_ball.values[:, 1:3], dtype=torch.float32)
+
+    df_fr = pd.read_csv(fr_csv)
+    firing_rates = torch.tensor(df_fr.values[:, :], dtype=torch.float32).T  # (T, N)
+
+    df_idx = pd.read_csv(game_index_csv)
+    start = df_idx.values[:, 1:3]
+    end = np.append(df_idx.values[1:, 1:3], (df_idx.values[-1, 1] + 1))
+    return ball_positions, firing_rates, start, end
+
+def _normalize_ball_positions(ball_positions: torch.Tensor, grid_size: float = 64.0) -> torch.Tensor:
+    return 2 * (ball_positions / grid_size) - 1
+
+def fit_line_and_get_intercept(prediction: torch.Tensor):
+    intercepts, slopes = [], []
+    for i in range(prediction.shape[0]):
+        pred_curr = prediction[i, :2]
+        pred_t_minus_3 = prediction[i, 2:4]
+
+        points = torch.stack([pred_curr, pred_t_minus_3])
+        x = points[:, 1]
+        y = points[:, 0]
+
+        A = torch.stack([x, torch.ones_like(x)], dim=1)
+        solution = torch.linalg.lstsq(A, y).solution
+        m, c = solution[0], solution[1]
+
+        slopes.append(float(m.item()))
+        intercepts.append(float(c.item()))
+    return intercepts, slopes
+
+def check_intercept_within_zone(
+    prediction: torch.Tensor,
+    last_position: torch.Tensor,
+    *,
+    tolerance: float = 4 / 32,
+) -> int:
+
+    intercepts, slopes = fit_line_and_get_intercept(prediction)
+
+    intercept = intercepts[0]
+    slope = slopes[0]
+
+    intercept_at_x_minus_1 = slope * (-1) + intercept
+    intercept_at_x_minus_1 = max(-1.0, min(intercept_at_x_minus_1, 1.0))
+
+    last_y = float(last_position[0, 0].item())
+
+    intercept_lower = max(-1.0, intercept_at_x_minus_1 - tolerance)
+    intercept_upper = min(1.0, intercept_at_x_minus_1 + tolerance)
+
+    last_y_lower = max(-1.0, last_y - tolerance)
+    last_y_upper = min(1.0, last_y + tolerance)
+
+    return 1 if (intercept_lower <= last_y_upper and intercept_upper >= last_y_lower) else 0
+
+def train_decode(
+    train_ball_csv: str,
+    train_fr_csv: str,
+    train_game_index_csv: str,
+    *,
+    lr: float = 1e-3,
+    seed: int | None = None,
+    device: str | torch.device | None = None,
+    save_model: bool = False,
+    save_path: str = "model_readout.pt",
+    print_every: int = 500,
+) -> tuple[nn.Module, dict]:
+
+    if seed is None:
+        seed = np.random.randint(0, 2**32)
+    print(f"Seed:{seed}")
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(device)
+
+    ball_positions, firing_rates, start, end = _load_pong_csvs(
+        train_ball_csv, train_fr_csv, train_game_index_csv
+    )
+
+    normalized_ball_positions = _normalize_ball_positions(ball_positions)
+
+    firing_rates = firing_rates.to(device)
+    normalized_ball_positions = normalized_ball_positions.to(device)
+
+    timesteps, num_neurons = firing_rates.shape
+    print(f"Loaded firing rates: {timesteps} timesteps, {num_neurons} neurons")
+
+    model = ReadoutModel(num_neurons=num_neurons, out_dim=4).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.MSELoss()
+
+    epochs = len(start) - 1
+
+    history = {
+        "seed": seed,
+        "device": str(device),
+        "lr": lr,
+        "losses_total": [],
+        "losses_current": [],
+        "losses_t_minus_3": [],
+        "total_steps": 0,
+        "epoch_score_running_mean": [],
+    }
+
+    accum_total = 0.0
+    accum_curr = 0.0
+    accum_p3 = 0.0
+    total_steps = 0
+    total_score = 0
+
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0.0
+        loss_curr = 0.0
+        loss_prev3 = 0.0
+        score = 0
+
+        for t in range(int(start[epoch].item()) + 3, int(end[epoch].item())):
+            total_steps += 1
+
+            trial_firing_rate = firing_rates[t, :].unsqueeze(0)
+
+            actual_curr = normalized_ball_positions[t, :].unsqueeze(0)
+            actual_t_minus_3 = normalized_ball_positions[t - 3, :].unsqueeze(0)
+
+            optimizer.zero_grad()
+            prediction = model(trial_firing_rate)
+
+            pred_curr = prediction[:, :2]
+            pred_t_minus_3 = prediction[:, 2:4]
+
+            loss_c = loss_fn(pred_curr, actual_curr)
+            loss_p3 = loss_fn(pred_t_minus_3, actual_t_minus_3)
+
+            step_loss = loss_c + loss_p3
+            step_loss.backward()
+            optimizer.step()
+
+            total_loss += float(step_loss.item())
+            loss_curr += float(loss_c.item())
+            loss_prev3 += float(loss_p3.item())
+
+            last_position = normalized_ball_positions[t, :].unsqueeze(0)
+            score = check_intercept_within_zone(prediction.detach(), last_position.detach())
+
+        accum_total += total_loss
+        accum_curr += loss_curr
+        accum_p3 += loss_prev3
+
+        history["losses_total"].append(accum_total / total_steps)
+        history["losses_current"].append(accum_curr / total_steps)
+        history["losses_t_minus_3"].append(accum_p3 / total_steps)
+
+        total_score += score
+        history["epoch_score_running_mean"].append(total_score / (epoch + 1))
+
+        if (epoch % print_every) == 0:
+            print(
+                f"Epoch {epoch}, "
+                f"Accumulative Mean Total Loss: {history['losses_total'][-1]:.4f}, "
+                f"Current Loss: {history['losses_current'][-1]:.4f}, "
+                f"t-3 Loss: {history['losses_t_minus_3'][-1]:.4f}, "
+                f"Score: {history['epoch_score_running_mean'][-1]:.4f}"
+            )
+
+    history["total_steps"] = total_steps
+    print("Training complete.")
+
+    if save_model:
+        ckpt = {
+            "model_state_dict": model.state_dict(),
+            "num_neurons": num_neurons,
+            "out_dim": 4,
+            "seed": seed,
+            "lr": lr,
+            "history": history,
+        }
+        torch.save(ckpt, save_path)
+        print(f"Saved model checkpoint to: {save_path}")
+
+    return model, history
+
+def test_decode(
+    model: nn.Module,
+    val_ball_csv: str,
+    val_fr_csv: str,
+    val_game_index_csv: str,
+    *,
+    device: str | torch.device | None = None,
+) -> dict:
+
+    if device is None:
+        device = next(model.parameters()).device
+    device = torch.device(device)
+
+    model.eval()
+
+    ball_positions_val, firing_rates_val, start_val, end_val = _load_pong_csvs(
+        val_ball_csv, val_fr_csv, val_game_index_csv
+    )
+
+    normalized_ball_positions_val = _normalize_ball_positions(ball_positions_val)
+
+    firing_rates_val = firing_rates_val.to(device)
+    normalized_ball_positions_val = normalized_ball_positions_val.to(device)
+
+    val_epochs = len(start_val) - 1
+
+    mse_all, rmse_all = [], []
+    mse_curr, rmse_curr = [], []
+    mse_t_minus_3, rmse_t_minus_3 = [], []
+
+    total_score = 0
+
+    def _compute_metrics(actual: torch.Tensor, pred: torch.Tensor, mse_list: list):
+        a = actual.squeeze().detach().cpu().numpy()
+        p = pred.squeeze().detach().cpu().numpy()
+        mse = mean_squared_error(a, p)
+        mse_list.append(float(mse))
+
+    with torch.no_grad():
+        for epoch in range(val_epochs):
+            score = 0
+            for t in range(int(start_val[epoch].item()) + 3, int(end_val[epoch].item())):
+                trial_firing_rate = firing_rates_val[t, :].unsqueeze(0)
+
+                actual_curr = normalized_ball_positions_val[t, :].unsqueeze(0)
+                actual_t_minus_3 = normalized_ball_positions_val[t - 3, :].unsqueeze(0)
+
+                prediction = model(trial_firing_rate)
+
+                pred_curr = prediction[:, :2]
+                pred_t_minus_3 = prediction[:, 2:4]
+
+                _compute_metrics(actual_curr, pred_curr, mse_curr)
+                _compute_metrics(actual_t_minus_3, pred_t_minus_3, mse_t_minus_3)
+
+                _compute_metrics(
+                    torch.cat([actual_curr, actual_t_minus_3], dim=0),
+                    prediction.view(-1, 2),
+                    mse_all
+                )
+
+                last_position = normalized_ball_positions_val[t, :].unsqueeze(0)
+                score = check_intercept_within_zone(prediction, last_position)
+
+            total_score += score
+
+    accuracy = total_score / val_epochs
+
+    def _summary(values: list[float]) -> dict:
+        arr = np.array(values, dtype=float)
+        arr = arr[~np.isnan(arr)]
+        if arr.size == 0:
+            return {"mean": np.nan, "std": np.nan, "n": 0}
+        return {
+            "mean": float(np.mean(arr)),
+            "std": float(np.std(arr, ddof=1)) if arr.size > 1 else 0.0,
+            "n": int(arr.size),
+        }
+
+    results = {
+        "accuracy": float(accuracy),
+
+        "mse_all": mse_all,
+        "mse_curr": mse_curr,
+        "mse_t_minus_3": mse_t_minus_3,
+
+        "summary": {
+            "MSE (All Positions)": _summary(mse_all),
+            "MSE (Current)": _summary(mse_curr),
+            "MSE (T-3)": _summary(mse_t_minus_3),
+        }
+    }
+
+    print(f"Validation Score: {results['accuracy']:.4f}")
+    print("-------------------------------------------------------------")
+    for k, v in results["summary"].items():
+        print(f"{k:24s} -> Mean: {v['mean']:.2f}, SD: {v['std']:.2f}, n={v['n']}")
+
+    return results
+
+def train_decode_full(
+    train_ball_csv: str,
+    train_fr_csv: str,
+    train_game_index_csv: str,
+    *,
+    lr: float = 1e-3,
+    seed: int | None = None,
+    device: str | torch.device | None = None,
+    save_model: bool = False,
+    save_path: str = "model_readout_full.pt",
+    print_every: int = 500,
+) -> tuple[nn.Module, dict]:
+
+    if seed is None:
+        seed = np.random.randint(0, 2**32)
+    print(f"Seed:{seed}")
+
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(device)
+
+    ball_positions, firing_rates, start, end = _load_pong_csvs(
+        train_ball_csv, train_fr_csv, train_game_index_csv
+    )
+    normalized_ball_positions = _normalize_ball_positions(ball_positions)
+
+    firing_rates = firing_rates.to(device)
+    normalized_ball_positions = normalized_ball_positions.to(device)
+
+    timesteps, num_neurons = firing_rates.shape
+    print(f"Loaded firing rates: {timesteps} timesteps, {num_neurons} neurons")
+
+    out_dim = 10
+    model = ReadoutModel(num_neurons=num_neurons, out_dim=out_dim).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.MSELoss()
+
+    epochs = len(start) - 1
+
+    history = {
+        "seed": seed,
+        "device": str(device),
+        "lr": lr,
+        "losses_total": [],
+        "losses_t": [],
+        "losses_t_minus_3": [],
+        "losses_t_minus_6": [],
+        "losses_t_minus_9": [],
+        "losses_t_minus_12": [],
+        "total_steps": 0,
+        "epoch_score_running_mean": [],
+    }
+
+    accum_total = 0.0
+    accum_t = 0.0
+    accum_p3 = 0.0
+    accum_p6 = 0.0
+    accum_p9 = 0.0
+    accum_p12 = 0.0
+
+    total_steps = 0
+    total_score = 0
+
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0.0
+        loss_t = 0.0
+        loss_p3 = 0.0
+        loss_p6 = 0.0
+        loss_p9 = 0.0
+        loss_p12 = 0.0
+        score = 0
+
+        # Need t-12 available
+        for t in range(int(start[epoch].item()) + 12, int(end[epoch].item())):
+            total_steps += 1
+
+            trial_firing_rate = firing_rates[t, :].unsqueeze(0)
+
+            actual_t = normalized_ball_positions[t, :].unsqueeze(0)
+            actual_p3 = normalized_ball_positions[t - 3, :].unsqueeze(0)
+            actual_p6 = normalized_ball_positions[t - 6, :].unsqueeze(0)
+            actual_p9 = normalized_ball_positions[t - 9, :].unsqueeze(0)
+            actual_p12 = normalized_ball_positions[t - 12, :].unsqueeze(0)
+
+            optimizer.zero_grad()
+            prediction = model(trial_firing_rate)
+
+            pred_t = prediction[:, 0:2]
+            pred_p3 = prediction[:, 2:4]
+            pred_p6 = prediction[:, 4:6]
+            pred_p9 = prediction[:, 6:8]
+            pred_p12 = prediction[:, 8:10]
+
+            l_t = loss_fn(pred_t, actual_t)
+            l_p3 = loss_fn(pred_p3, actual_p3)
+            l_p6 = loss_fn(pred_p6, actual_p6)
+            l_p9 = loss_fn(pred_p9, actual_p9)
+            l_p12 = loss_fn(pred_p12, actual_p12)
+
+            step_loss = l_t + l_p3 + l_p6 + l_p9 + l_p12
+            step_loss.backward()
+            optimizer.step()
+
+            total_loss += float(step_loss.item())
+            loss_t += float(l_t.item())
+            loss_p3 += float(l_p3.item())
+            loss_p6 += float(l_p6.item())
+            loss_p9 += float(l_p9.item())
+            loss_p12 += float(l_p12.item())
+
+            last_position = normalized_ball_positions[t, :].unsqueeze(0)
+            score = check_intercept_within_zone(prediction.detach(), last_position.detach())
+
+        accum_total += total_loss
+        accum_t += loss_t
+        accum_p3 += loss_p3
+        accum_p6 += loss_p6
+        accum_p9 += loss_p9
+        accum_p12 += loss_p12
+
+        history["losses_total"].append(accum_total / total_steps)
+        history["losses_t"].append(accum_t / total_steps)
+        history["losses_t_minus_3"].append(accum_p3 / total_steps)
+        history["losses_t_minus_6"].append(accum_p6 / total_steps)
+        history["losses_t_minus_9"].append(accum_p9 / total_steps)
+        history["losses_t_minus_12"].append(accum_p12 / total_steps)
+
+        total_score += score
+        history["epoch_score_running_mean"].append(total_score / (epoch + 1))
+
+        if (epoch % print_every) == 0:
+            print(
+                f"Epoch {epoch}, "
+                f"Acc Mean Total Loss: {history['losses_total'][-1]:.4f}, "
+                f"t: {history['losses_t'][-1]:.4f}, "
+                f"t-3: {history['losses_t_minus_3'][-1]:.4f}, "
+                f"t-6: {history['losses_t_minus_6'][-1]:.4f}, "
+                f"t-9: {history['losses_t_minus_9'][-1]:.4f}, "
+                f"t-12: {history['losses_t_minus_12'][-1]:.4f}, "
+                f"Score: {history['epoch_score_running_mean'][-1]:.4f}"
+            )
+
+    history["total_steps"] = total_steps
+    print("Training complete.")
+
+    if save_model:
+        ckpt = {
+            "model_state_dict": model.state_dict(),
+            "num_neurons": num_neurons,
+            "out_dim": out_dim,
+            "seed": seed,
+            "lr": lr,
+            "history": history,
+        }
+        torch.save(ckpt, save_path)
+        print(f"Saved model checkpoint to: {save_path}")
+
+    return model, history
+
+def test_decode_full(
+    model: nn.Module,
+    val_ball_csv: str,
+    val_fr_csv: str,
+    val_game_index_csv: str,
+    *,
+    device: str | torch.device | None = None,
+) -> dict:
+
+    if device is None:
+        device = next(model.parameters()).device
+    device = torch.device(device)
+
+    model.eval()
+
+    ball_positions_val, firing_rates_val, start_val, end_val = _load_pong_csvs(
+        val_ball_csv, val_fr_csv, val_game_index_csv
+    )
+    normalized_ball_positions_val = _normalize_ball_positions(ball_positions_val)
+
+    firing_rates_val = firing_rates_val.to(device)
+    normalized_ball_positions_val = normalized_ball_positions_val.to(device)
+
+    val_epochs = len(start_val) - 1
+
+    mse_all = []
+    mse_t, mse_p3, mse_p6, mse_p9, mse_p12 = [], [], [], [], []
+
+    total_score = 0
+
+    def _compute_mse(actual: torch.Tensor, pred: torch.Tensor, mse_list: list):
+        a = actual.squeeze().detach().cpu().numpy()
+        p = pred.squeeze().detach().cpu().numpy()
+        mse_list.append(float(mean_squared_error(a, p)))
+
+    with torch.no_grad():
+        for epoch in range(val_epochs):
+            score = 0
+            for t in range(int(start_val[epoch].item()) + 12, int(end_val[epoch].item())):
+                trial_firing_rate = firing_rates_val[t, :].unsqueeze(0)
+
+                actual_t = normalized_ball_positions_val[t, :].unsqueeze(0)
+                actual_p3 = normalized_ball_positions_val[t - 3, :].unsqueeze(0)
+                actual_p6 = normalized_ball_positions_val[t - 6, :].unsqueeze(0)
+                actual_p9 = normalized_ball_positions_val[t - 9, :].unsqueeze(0)
+                actual_p12 = normalized_ball_positions_val[t - 12, :].unsqueeze(0)
+
+                prediction = model(trial_firing_rate)
+
+                pred_t = prediction[:, 0:2]
+                pred_p3 = prediction[:, 2:4]
+                pred_p6 = prediction[:, 4:6]
+                pred_p9 = prediction[:, 6:8]
+                pred_p12 = prediction[:, 8:10]
+
+                _compute_mse(actual_t, pred_t, mse_t)
+                _compute_mse(actual_p3, pred_p3, mse_p3)
+                _compute_mse(actual_p6, pred_p6, mse_p6)
+                _compute_mse(actual_p9, pred_p9, mse_p9)
+                _compute_mse(actual_p12, pred_p12, mse_p12)
+
+                _compute_mse(
+                    torch.cat([actual_t, actual_p3, actual_p6, actual_p9, actual_p12], dim=0),
+                    prediction.view(-1, 2),
+                    mse_all
+                )
+
+                last_position = normalized_ball_positions_val[t, :].unsqueeze(0)
+                score = check_intercept_within_zone(prediction, last_position)
+
+            total_score += score
+
+    accuracy = total_score / val_epochs
+
+    def _summary(values: list[float]) -> dict:
+        arr = np.array(values, dtype=float)
+        arr = arr[~np.isnan(arr)]
+        if arr.size == 0:
+            return {"mean": np.nan, "std": np.nan, "n": 0}
+        return {
+            "mean": float(np.mean(arr)),
+            "std": float(np.std(arr, ddof=1)) if arr.size > 1 else 0.0,
+            "n": int(arr.size),
+        }
+
+    results = {
+        "accuracy": float(accuracy),
+        "mse_all": mse_all,
+        "mse_t": mse_t,
+        "mse_t_minus_3": mse_p3,
+        "mse_t_minus_6": mse_p6,
+        "mse_t_minus_9": mse_p9,
+        "mse_t_minus_12": mse_p12,
+        "summary": {
+            "MSE (All Points)": _summary(mse_all),
+            "MSE (t)": _summary(mse_t),
+            "MSE (t-3)": _summary(mse_p3),
+            "MSE (t-6)": _summary(mse_p6),
+            "MSE (t-9)": _summary(mse_p9),
+            "MSE (t-12)": _summary(mse_p12),
+        }
+    }
+
+    print(f"Validation Score: {results['accuracy']:.4f}")
+    print("-------------------------------------------------------------")
+    for k, v in results["summary"].items():
+        print(f"{k:18s} -> Mean: {v['mean']:.2f}, SD: {v['std']:.2f}, n={v['n']}")
+
+    return results
+
+def plot_mse_with_std(
+    time_points,
+    mse_means,
+    mse_stds,
+    *,
+    labels=None,
+    colors=None,
+    figsize=(15, 3),
+    ncols=4,
+    ylim=(0, 0.5),
+    xlabel="Position (frames)",
+    ylabel="MSE test",
+    marker_line="-o",
+    alpha_fill=0.2,
+    hide_spines=True,
+):
+
+    K = len(mse_means)
+    if labels is None:
+        labels = [f"cond_{i}" for i in range(K)]
+    if colors is None:
+        colors = [None] * K
+
+    plt.figure(figsize=figsize)
+
+    for i in range(K):
+        plt.subplot(1, ncols, i + 1)
+
+        y = np.asarray(mse_means[i], dtype=float)
+        s = np.asarray(mse_stds[i], dtype=float)
+
+        plt.plot(time_points, y, marker_line, label=labels[i], color=colors[i])
+        plt.fill_between(
+            time_points,
+            y - s,
+            y + s,
+            color=colors[i],
+            alpha=alpha_fill,
+        )
+
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.ylim(*ylim)
+        plt.title(labels[i])
+
+        if hide_spines:
+            ax = plt.gca()
+            ax.spines["top"].set_visible(False)
+            ax.spines["right"].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
+
+def plot_placefield_map(
+    csv_path: str,
+    *,
+    timebin=None,
+    timebin_index: int | None = 2,
+    grid_size: int = 64,
+    normalize_global: bool = True,
+    cmap: str = "hot",
+    vmin: float = 0.0,
+    vmax: float = 1.0,
+    figsize=(5, 4),
+    return_grid: bool = False,
+):
+
+    data = pd.read_csv(csv_path)
+
+    data['NeuronIndex'] = data['NeuronIndex'].astype(int)
+    data = data.sort_values(by='TimeBin').reset_index(drop=True)
+
+    unique_bins = data['TimeBin'].unique()
+
+    if timebin is None:
+        if timebin_index is None:
+            raise ValueError("Provide either timebin or timebin_index")
+        timebin = unique_bins[timebin_index]
+
+    subset = data[data['TimeBin'] == timebin].copy()
+
+    if normalize_global:
+        max_rate = data['FiringRate (Hz)'].max()
+    else:
+        max_rate = subset['FiringRate (Hz)'].max()
+
+    subset['NormalizedFiringRate'] = subset['FiringRate (Hz)'] / max_rate
+
+    grid = np.zeros((grid_size, grid_size))
+
+    for _, row in subset.iterrows():
+        neuron_index = int(row['NeuronIndex'])
+        if 0 <= neuron_index < grid_size * grid_size:
+            x, y = divmod(neuron_index, grid_size)
+            grid[x, y] = row['NormalizedFiringRate']
+
+    plt.figure(figsize=figsize)
+    im = plt.imshow(grid, cmap=cmap, vmin=vmin, vmax=vmax, origin='upper', interpolation='nearest')
+    cbar = plt.colorbar(im)
+    cbar.set_label('Normalized Firing Rate', rotation=270, labelpad=20)
+    plt.xticks([])
+    plt.yticks([])
+    plt.title(f"TimeBin: {timebin}")
+    plt.show()
+
+    if return_grid:
+        return grid
+
+def get_coordinates(index: int, grid_size: int = 64):
+    x = index % grid_size
+    y = index // grid_size
+    return x, y
+
+def get_sum_weights(weights_file: str, connectivity_file: str, *, grid_size: int = 64):
+
+    weights = pd.read_csv(weights_file)
+    connections = pd.read_csv(connectivity_file)
+
+    source_coords = np.array([get_coordinates(i, grid_size) for i in connections["Source"]])
+    target_coords = np.array([get_coordinates(i, grid_size) for i in connections["Target"]])
+
+    all_data = []
+    for x in range(grid_size):
+        source_mask = source_coords[:, 0] == x
+        distances = target_coords[source_mask][:, 0] - x
+
+        # assumes weights rows align with connections rows
+        weights_at_x = weights[source_mask].values.flatten()
+
+        all_data.append(
+            pd.DataFrame(
+                {"Source_X": x, "Distance": distances, "Weight": weights_at_x}
+            )
+        )
+
+    all_data_df = pd.concat(all_data, ignore_index=True)
+    sum_weights_df = all_data_df.groupby("Distance")["Weight"].sum().reset_index()
+    return all_data_df, sum_weights_df
+
+def plot_distance_weight_profiles(
+    file_data,
+    *,
+    labels=("EE", "EI", "IE", "II"),
+    colors=None,
+    grid_size: int = 64,
+    figsize=(4, 1.5),
+    dpi: int = 300,
+    axwidth: float = 3,
+    fontsize: int = 10,
+    xlim=(0, 63),
+    xticks=(0, 63),
+    ylim=(0, 0.02),
+    yticks=(0, 0.02),
+    w_pad: float = 0.3,
+    normalize: bool = True,
+):
+    
+    K = len(file_data)
+    if colors is None:
+        colors = [None] * K
+
+    pe1 = [
+        pe.Stroke(linewidth=1.5 * 0.66 * axwidth, foreground="black"),
+        pe.Stroke(foreground="white", alpha=1),
+        pe.Normal(),
+    ]
+
+    fig, axes = plt.subplots(1, K, figsize=figsize, dpi=dpi, sharey=True)
+    if K == 1:
+        axes = [axes]
+
+    for i, ax in enumerate(axes):
+        _, sum_weights_df = get_sum_weights(
+            file_data[i][0], file_data[i][1], grid_size=grid_size
+        )
+
+        dists = np.asarray(sum_weights_df["Distance"], dtype=int)
+        sum_ws = np.asarray(sum_weights_df["Weight"], dtype=float)
+
+        if normalize:
+            denom = np.sum(sum_ws)
+            if denom != 0:
+                sum_ws = sum_ws / denom
+
+        mid = len(dists) // 2
+
+        pos_distances = dists[mid:]
+        neg_dist_w = np.flip(sum_ws[: mid + 1])
+        pos_dist_w = sum_ws[mid:]
+
+        ax.plot(
+            pos_distances,
+            pos_dist_w,
+            linewidth=axwidth,
+            color=colors[i],
+            clip_on=True,
+            zorder=0.5,
+        )
+
+        ax.plot(
+            pos_distances,
+            neg_dist_w,
+            "-",
+            linewidth=0.66 * axwidth,
+            color=colors[i],
+            clip_on=True,
+            zorder=0.6,
+            path_effects=pe1,
+            alpha=0.4,
+        )
+
+        ax.set_xlim(list(xlim))
+        ax.set_xticks(list(xticks))
+        ax.set_title(labels[i], fontsize=fontsize, pad=2)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_linewidth(axwidth)
+        ax.spines["left"].set_linewidth(axwidth)
+
+        ax.tick_params(width=axwidth, labelsize=fontsize, length=2 * axwidth, pad=1)
+        ax.set_xlabel("d", fontsize=fontsize)
+
+    axes[0].set_ylabel(r"$\langle w_{ij}(i \rightarrow j = d) \rangle$", fontsize=fontsize)
+    for ax in axes[1:]:
+        ax.set_yticklabels([])
+
+    axes[0].set_ylim(list(ylim))
+    axes[0].set_yticks(list(yticks))
+
+    plt.tight_layout(w_pad=w_pad)
+    plt.show()
+
+def plot_accuracy_bar(
+    file_paths,
+    *,
+    column="val_accuracy",
+    labels=None,
+    colors=None,
+    figsize=(4, 4),
+    ylabel="Pong Accuracy",
+    ylim=(0, 0.8),
+    capsize=5,
+    show_values=False,
+):
+
+    dfs = [pd.read_csv(fp) for fp in file_paths]
+
+    means = [df[column].mean() for df in dfs]
+    stds = [df[column].std() for df in dfs]
+
+    if labels is None:
+        labels = [f"cond_{i}" for i in range(len(file_paths))]
+    if colors is None:
+        colors = [None] * len(file_paths)
+
+    plt.figure(figsize=figsize)
+    bars = plt.bar(labels, means, yerr=stds, capsize=capsize, color=colors)
+
+    if show_values:
+        for bar, val in zip(bars, means):
+            plt.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{val:.2f}",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+    plt.ylabel(ylabel)
+    plt.ylim(*ylim)
+
+    ax = plt.gca()
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
