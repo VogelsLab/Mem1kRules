@@ -2,7 +2,7 @@ import numpy as np
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 import matplotlib.pyplot as plt
 import torch
-
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 ###  Define colors and colormaps of the paper
 
@@ -320,6 +320,14 @@ def N_OR(conditions):
     for i in range(1, n_conditions):
         cond = np.logical_or(cond, conditions[i])
     return(cond)
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=256):
+    """Truncate a colormap to a subrange [minval, maxval]."""
+    new_cmap = LinearSegmentedColormap.from_list(
+        f"trunc({cmap.name},{minval:.2f},{maxval:.2f})",
+        cmap(np.linspace(minval, maxval, n))
+    )
+    return new_cmap
 
 ### General plotting
 
@@ -1263,6 +1271,75 @@ def get_inds_last_el_sequence_stim_pres(n_bins, test_starts, ontime_test, offtim
             start += 1
     return(inds_seq_stim)   
 
+####### Replay
+
+def get_rhos_1tbreak_1rule(eng_rates, rule_ind, break_ind, n_fam=5, n_nov=2):
+    nov_rates_av = np.mean(eng_rates[rule_ind, break_ind, :n_nov, :], axis=0) + 0.1
+    return(np.array([eng_rates[rule_ind, break_ind, n_nov + (i+1)%n_fam, :]/nov_rates_av for i in range(n_fam)]))
+
+def get_t_i(rho_i, ind_t_start, ind_t_end):
+    return(np.argmax(rho_i[ind_t_start:ind_t_end]) + ind_t_start)
+
+def get_rhos(eng_rates, n_fam=5, n_nov=2):
+    nov_rates_av = np.mean(eng_rates[:, :, :n_nov, :], axis=2) + 0.1
+    # print(nov_rates_av.shape)
+    return(np.array([eng_rates[:, :, n_nov + (i+1)%n_fam, :]/nov_rates_av for i in range(n_fam)]))
+
+def get_inds_start_single_stim_pres(test_starts, ontime_test, offtime_test, n_fam=5):
+    start_inds = np.zeros(n_fam, dtype=int)
+    stop_inds = np.zeros(n_fam, dtype=int)
+    for i in range(n_fam): 
+        start_inds[i] = test_starts + (i+2)*(ontime_test + offtime_test) # first 2 stim are novel
+        stop_inds[i] = start_inds[i] + ontime_test + offtime_test - 1
+    return(start_inds, stop_inds)
+
+def get_ts_maxrhos(rhos, inds_start, inds_stop, n_fam=5):
+    n_rules = rhos.shape[1]
+    n_breaks = rhos.shape[2]
+    ts_max = np.zeros( (n_fam, n_rules, n_breaks), dtype=int)
+    for i in range(n_fam):
+        ts_max[i] = np.argmax(rhos[i, :, :, inds_start[i]:inds_stop[i]], axis=2) + inds_start[i] # we want to look at response of stim i while we showed stim i-1 to the net, that lag is already in rho
+    return(ts_max)
+
+def plot_replay_metrics_1rule(rhos_max_av, rhos_spec_av, ts_max, axwidth=1.5, linewidth=1.5, fontsize=10, xticks_pad=1, yticks_pad=0, font='arial'):
+    fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(1, 1.5), dpi=300)
+
+    ax1.plot(rhos_max_av, 'black', linewidth=linewidth)
+    ax1.set_ylabel(r'$\rho_{max}^{rep}$', fontname=font, fontsize=fontsize, labelpad=1)
+    ax1.set_xlim([0,9])
+    ax1.set_xticks([0,5,9], labels=["", "", ""])
+    ax1.spines['top'].set_visible(False)
+    ax1.spines['right'].set_visible(False)
+    ax1.spines['bottom'].set_linewidth(axwidth)
+    ax1.spines['left'].set_linewidth(axwidth)
+    ax1.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax1.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    ax2.plot(rhos_spec_av, 'blue', linewidth=linewidth)
+    ax2.set_ylabel(r'$\rho_{spec}^{rep}$', fontname=font, fontsize=fontsize, labelpad=1)
+    ax2.set_xlim([0,9])
+    ax2.set_xticks([0,5,9], labels=["", "", ""])
+    ax2.spines['top'].set_visible(False)
+    ax2.spines['right'].set_visible(False)
+    ax2.spines['bottom'].set_linewidth(axwidth)
+    ax2.spines['left'].set_linewidth(axwidth)
+    ax2.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax2.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+
+    ax3.plot(ts_max, 'green', linewidth=linewidth)
+    ax3.set_ylabel(r'$t_{i}^{*}$', fontname=font, fontsize=fontsize, labelpad=1)
+    ax3.set_xlim([0,9])
+    ax3.set_xticks([0,5,9], labels=["1s", "5min", "4h"])
+    ax3.set_ylim([0,30])
+    ax3.set_yticks([0,30])
+    ax3.spines['top'].set_visible(False)
+    ax3.spines['right'].set_visible(False)
+    ax3.spines['bottom'].set_linewidth(axwidth)
+    ax3.spines['left'].set_linewidth(axwidth)
+    ax3.tick_params(axis='x', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=xticks_pad)
+    ax3.tick_params(axis='y', width=axwidth, labelsize=fontsize, length=2*axwidth, pad=yticks_pad)
+    
+    plt.show()
 
 ### Spiking network analysis, compute engrams
 
