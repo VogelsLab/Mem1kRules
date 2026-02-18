@@ -1,4 +1,7 @@
-data/
+data/data_Allen
+data/data_Brunel
+data/data_sims
+data/data_synaptic
 
 # OS/editor artifacts
 .DS_Store

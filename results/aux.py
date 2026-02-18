@@ -767,7 +767,7 @@ def plot_4_rules_histogram(dws_hist_ee,
     plt.subplots_adjust(wspace=0.2, hspace=0)
     if save_fig:
         plt.savefig(path, transparent=True)
-    fig.show()
+    plt.show()
 
 def plot_fraction_significant_rules(prop, figsize=(1,1), dpi=600, x_lim=None, x_ticks=None, x_ticklabels=None,
                                    x_label=None, y_lim=None, y_ticks=None, y_ticklabels=None, y_label=None,
@@ -1798,6 +1798,26 @@ def read_monitor_spiketime_files(filename, num_neurons=4096):
             spiketimes[str(int(aux[1]))].append(float(aux[0]))
         except:
             print("problem with file", filename)
+    return spiketimes
+
+def read_monitor_spiketime_file_nparray(filename, num_neurons=4096):
+
+    spiketimes = {str(neuron): [] for neuron in range(num_neurons)}
+
+    try:
+        f = open(filename, "r")
+    except:
+        print("problem with st file, returning None")
+        return(None)
+    lines = f.readlines()
+    for line in lines:
+        aux = line.split(" ")
+        try:
+            spiketimes[str(int(aux[1]))].append(float(aux[0]))
+        except:
+            print("problem with file", filename)
+    for neuron in range(num_neurons):
+        spiketimes[str(neuron)] = np.array(spiketimes[str(neuron)])
     return spiketimes
 
 def load_w_mat(filename):
@@ -3252,4 +3272,167 @@ def plot_accuracy_bar(
     ax.spines["right"].set_visible(False)
 
     plt.tight_layout()
+    plt.show()
+
+
+### Demo
+
+def plot_engrams_demo(sts):
+    n_recorded = 4096
+    l_stim_on_pretraineng = 1
+    l_stim_off_pretraineng = 1
+    l_pre_test_record = 1
+    frac_size_engram = 0.05
+    lpt = 30
+    lt = 50
+    n_fam_stim = 5
+    n_nov_stim = 2
+    n_tot_stim = 7
+    ontime_test = 0.2
+    offtime_test = 2.8
+    nseqs_test = 15
+    seq_length_test = 4
+    break_durations = [1, 9, 10, 40, 60, 180, 300, 600,  2400, 10800]
+    n_tests = len(break_durations)
+    bin_size_big = 0.1
+    l_pretraineng_tot = n_tot_stim*(l_stim_on_pretraineng+l_stim_off_pretraineng)
+    l_singlestims_test = n_tot_stim*(ontime_test + offtime_test)
+    l_seqstims_test = nseqs_test*(seq_length_test*ontime_test+offtime_test)
+    l_1test = l_singlestims_test + l_seqstims_test
+    test_starts = np.zeros(len(break_durations))
+    test_starts[0] = lpt + l_pretraineng_tot + lt + break_durations[0]
+    for i in range(1,len(break_durations)):
+        test_starts[i] = test_starts[i-1] + break_durations[i] + l_1test
+    engram_neurons = get_engram_neurons_npy(n_tot_stim, lpt, l_stim_on_pretraineng, l_stim_off_pretraineng, frac_size_engram, n_recorded, sts)
+    eng_rates = get_eng_rate_npy(sts, test_starts, l_pre_test_record, l_1test, bin_size_big, n_tests, n_recorded, n_tot_stim, engram_neurons)
+
+    #make the ordering per engram. problem, some neurons can be assigned to 2 engrams, thouhg it is rare.
+    # assign a unique label to each neuron
+    neuron_label = np.zeros(n_recorded) + 7 #0->nov1, ... 6->fam5, 7 unassigned
+    for i in range(n_recorded):
+        found = False
+        eng_count = 0
+        while (not found) and (eng_count <= 6):
+            if len(np.argwhere(engram_neurons[eng_count, :] == i))>0:
+                found = True
+                neuron_label[i] = eng_count
+            eng_count += 1
+
+    test_sessions = [1, 9]
+    neuron_label_bis = np.array(neuron_label) # simply rearranging label names for plotting purposes
+    neuron_label_bis[np.where(neuron_label_bis==0)[0]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==1)[0]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==2)[0][100:]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==2)[0][:100]] = 0
+
+    neuron_label_bis[np.where(neuron_label_bis==3)[0][100:]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==3)[0][:100]] = 1
+
+    neuron_label_bis[np.where(neuron_label_bis==4)[0][100:]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==4)[0][:100]] = 2
+
+    neuron_label_bis[np.where(neuron_label_bis==5)[0][100:]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==5)[0][:100]] = 3
+
+    neuron_label_bis[np.where(neuron_label_bis==6)[0][100:]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==6)[0][:100]] = 4
+
+    neuron_label_bis[np.where(neuron_label_bis==7)[0][200:]] = -1
+    neuron_label_bis[np.where(neuron_label_bis==7)[0][:200]] = 5
+    test_session = 2
+    print('After 10s')
+    plot_raster_w_engrams_sep_background(sts=sts,
+        neuron_labels=neuron_label_bis,
+        n_recorded=n_recorded,
+        colors_label = ['#36454F', color_nov1, color_fam1, color_fam2, color_fam3, color_fam4, color_fam5, '#36454F'],
+        colors_raster = [color_fam1, color_fam2, color_fam3, color_fam4, color_fam5, '#36454F'],
+        x_lim = [test_starts[test_session]+2.5, test_starts[test_session]+8.9],
+        markersize=0.1,
+        lag_engr_bg = 30,
+        t_start_each_stim = [i*(ontime_test + offtime_test) for i in range(7)] + test_starts[test_session],
+        ontime = ontime_test,
+        linewidth_stim_line=1.5,
+        y_stim_line = 730,
+        figsize= (0.8,0.7), #(2.1,0.7), (0.8,0.7) (1.5,0.7)
+        x_label= "200ms", #r'$4$' + "h"
+        x_ticks= [],
+        x_ticklabels= [],
+        y_ticks=[],
+        y_label="100 neurons",
+        y_lim=[0,800], #1400
+        fontsize=10,
+        dpi=600,
+        ylabel_xloc=0.0,
+        ylabel_yloc=0.0,
+        xlabel_xloc=0.40,
+        xlabel_yloc=0.92,
+        y_bar_xloc=-0.05,
+        y_bar_ylocs=[2.85/7, 3.6/7],
+        axwidth=1.5);plt.show()
+    
+    test_session = 9
+    print('After 4h')
+    plot_raster_w_engrams_sep_background(sts=sts,
+        neuron_labels=neuron_label_bis,
+        n_recorded=n_recorded,
+        colors_label = ['#36454F', color_nov1, color_fam1, color_fam2, color_fam3, color_fam4, color_fam5, '#36454F'],
+        colors_raster = [color_fam1, color_fam2, color_fam3, color_fam4, color_fam5, '#36454F'],
+        x_lim = [test_starts[test_session]+2.5, test_starts[test_session]+8.9],
+        markersize=0.1,
+        lag_engr_bg = 30,
+        t_start_each_stim = [i*(ontime_test + offtime_test) for i in range(7)] + test_starts[test_session],
+        ontime = ontime_test,
+        linewidth_stim_line=1.5,
+        y_stim_line = 730,
+        figsize= (0.8,0.7), #(2.1,0.7), (0.8,0.7) (1.5,0.7)
+        x_label= "200ms", #r'$4$' + "h"
+        x_ticks= [],
+        x_ticklabels= [],
+        y_ticks=[],
+        y_label="100 neurons",
+        y_lim=[0,800], #1400
+        fontsize=10,
+        dpi=600,
+        ylabel_xloc=0.0,
+        ylabel_yloc=0.0,
+        xlabel_xloc=0.40,
+        xlabel_yloc=0.92,
+        y_bar_xloc=-0.05,
+        y_bar_ylocs=[2.85/7, 3.6/7],
+        axwidth=1.5);plt.show()
+    
+def plot_dr_demo(dr, color="black", x_label='time', y_label=r'$\Delta r_{mem}$', x_lim = None, y_lim=None,
+                linewidth=1.5, axwidth=1.5, fontsize=10, figsize=(3, 1), font = "arial",
+                dpi=600, x_ticks=[0,5,9], x_ticklabels=["1s","5min","4h"], y_ticks=None, y_ticklabels=None):
+    
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+
+    ax.plot(dr, color=color, linewidth=linewidth, marker='')
+
+    if x_ticks is not None:
+        ax.set_xticks(x_ticks)
+    if x_ticklabels is not None:
+        ax.set_xticklabels(x_ticklabels)
+    ax.set_xlabel(x_label, fontsize=fontsize, fontname=font, labelpad = 0)
+    if x_lim is not None:
+        ax.set_xlim([t_lim[0], t_lim[1]])
+    
+    if y_lim is not None:
+        ax.set_ylim([y_lim[0], y_lim[1]])
+        ax.set_yticks([y_lim[0], y_lim[1]])
+    if y_ticks is not None:
+        ax.set_yticks(y_ticks)
+    if y_ticklabels is not None:
+        ax.set_yticklabels(y_ticklabels)
+    ax.set_ylabel(y_label, fontname=font, fontsize=fontsize, labelpad = 0)
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_linewidth(axwidth)
+    ax.spines['left'].set_linewidth(axwidth)
+    ax.tick_params(width=axwidth, labelsize=fontsize, length=2*axwidth)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
+    for tick in ax.get_yticklabels():
+        tick.set_fontname(font)
     plt.show()
