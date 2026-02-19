@@ -1,0 +1,19 @@
+name: mem1krules
+channels:
+  - conda-forge
+  - pytorch
+  - defaults
+dependencies:
+  - python=3.11
+  - numpy
+  - matplotlib
+  - scipy
+  - pandas
+  - scikit-learn
+  - pyyaml
+  - h5py
+  - pytorch
+  - jupyterlab
+  - ipykernel
+  - pip
+

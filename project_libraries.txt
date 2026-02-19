@@ -1,0 +1,14 @@
+Mem1kRules project libraries for \results
+
+Python libraries
+- numpy
+- matplotlib
+- scipy
+- pandas
+- scikit-learn
+- pyyaml
+- h5py
+- torch (PyTorch)
+
+Notes
+- `cluster_deployment` relies on additional tools/libraries.

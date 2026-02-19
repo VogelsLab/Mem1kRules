@@ -15,8 +15,8 @@ Note that the original full simulation results (>100Tb) are archived at ISTA and
 Download the data on this link and add all files to the "data" folder of this repository: https://huggingface.co/datasets/bconfavr/Mem1kRules
 
 ## Libraries needed to run the code
-numpy, matplotlib, sklearn, scipy, torch and pandas
-You can use the yaml file to create a working conda environment.
+numpy, matplotlib, sklearn, scipy, torch, pandas and jupyter
+You can use the yaml file to create a working conda environment: conda env create -f ./environment.yml
 
 ## Running spiking networks
 This part uses auryn, the code shown in \cluster_deployment builds on the fSBI repository (https://github.com/VogelsLab/fSBI).
