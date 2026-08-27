@@ -16,6 +16,29 @@ cluster workflow:
 These changes can alter results relative to historical runs. That is expected:
 the historical output ID did not control all random streams.
 
+## Using the corrected branch
+
+Clone the repository or update an existing clone:
+
+```bash
+git fetch origin
+git switch --track origin/fix/bnd-reproducibility
+```
+
+If the branch already exists locally:
+
+```bash
+git switch fix/bnd-reproducibility
+```
+
+To return to the original legacy pipeline:
+
+```bash
+git switch main
+```
+
+After switching to the corrected branch, follow the build and usage instructions below.
+
 ## Build
 
 Compile the simulator in the Auryn environment:
