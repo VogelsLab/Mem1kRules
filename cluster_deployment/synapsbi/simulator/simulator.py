@@ -563,24 +563,61 @@ class Simulator_BND_IF_EEEIIEII_6pPol:
         rule_string += "a" + "{}" + "a" + "{}" + "a" + "{}" + "a" + "{}" + "a" #no rate poisson here
         return rule_string
 
-    def sample(self, thetas, seeds=None, return_data=False, verbose=0):
-        """Forward pass through simulator."""
+    def format_rule(self, theta):
+        """Format the four BND rules from a current or legacy theta vector."""
+        theta = list(theta)
+        if len(theta) not in (24, 25):
+            raise ValueError(
+                "BND expects 24 rule parameters, optionally followed by the "
+                "legacy background-rate nuisance parameter"
+            )
+        return self.rule_str.format(*theta[:24])
+
+    def format_command(self, theta, output_id, simulation_seed=None):
+        """Build one BND command while keeping output ID and RNG seed separate."""
+        command = self.cl_str % (str(output_id), self.format_rule(theta))
+        if simulation_seed is not None:
+            simulation_seed = int(simulation_seed)
+            if not 0 <= simulation_seed <= 2**32 - 1:
+                raise ValueError("simulation_seed must be an unsigned 32-bit integer")
+            command += " --seed %d" % simulation_seed
+        return command
+
+    def sample(
+        self,
+        thetas,
+        seeds=None,
+        return_data=False,
+        verbose=0,
+        simulation_seeds=None,
+    ):
+        """Forward pass through simulator.
+
+        ``seeds`` is retained as the legacy name for output identifiers because
+        those values are used in monitor filenames. Pass ``simulation_seeds``
+        to control stochastic realizations explicitly. If it is omitted, the
+        C++ simulator deterministically derives a seed from each output ID.
+        """
         if seeds is None: #should not happen
             print("no seed was passed, generating some, but careful")
             seeds = [42 + i for i, _ in enumerate(thetas)]
         else:
             assert len(thetas) == len(seeds)
+        if simulation_seeds is None:
+            simulation_seeds = [None] * len(seeds)
+        elif len(thetas) != len(simulation_seeds):
+            raise ValueError("thetas and simulation_seeds must have equal length")
 
         all_spiketimes = []
         all_weights = []
 
-        for th, seed in zip(thetas, seeds):
+        for th, seed, simulation_seed in zip(thetas, seeds, simulation_seeds):
             # run auryn simulation
-            rule_str = self.rule_str.format(*list(th))
+            command = self.format_command(th, seed, simulation_seed)
             if verbose > 0:
-                print(self.cl_str % (str(seed), rule_str))
+                print(command)
             output = subprocess.run(
-                self.cl_str % (str(seed), rule_str), shell=True, capture_output=True
+                command, shell=True, capture_output=True
             )
 
             if return_data:
@@ -962,13 +999,32 @@ class Simulator_seq_CVAIF_EEIE_T4wvceciMLP:
             return(float(output.stdout.decode().split("cynthia")[1]))
 
         
-def make_param_files_cluster(simulator, thetas, seeds, filename):
+def make_param_files_cluster(
+    simulator, thetas, seeds, filename, simulation_seeds=None
+):
     """
     simulator: a simulator object as above. TODO make ABC
+
+    ``simulation_seeds`` is supported by simulators that implement
+    ``format_command``. Other simulator classes retain their historical command
+    generation behavior.
     """
 
+    if simulation_seeds is None:
+        simulation_seeds = [None] * len(seeds)
+    elif len(seeds) != len(simulation_seeds):
+        raise ValueError("seeds and simulation_seeds must have equal length")
+
     with open(filename, "w") as f:
-        for th, seed in zip(thetas, seeds):
-            rule_str = simulator.rule_str.format(*list(th))
-            f.write(simulator.cl_str % (str(seed), rule_str) + '\n')
+        for th, seed, simulation_seed in zip(thetas, seeds, simulation_seeds):
+            if hasattr(simulator, "format_command"):
+                command = simulator.format_command(th, seed, simulation_seed)
+            else:
+                if simulation_seed is not None:
+                    raise ValueError(
+                        "simulation_seeds requires a simulator with format_command"
+                    )
+                rule_str = simulator.rule_str.format(*list(th))
+                command = simulator.cl_str % (str(seed), rule_str)
+            f.write(command + '\n')
     print("wrote", len(seeds), "call strings to", filename)

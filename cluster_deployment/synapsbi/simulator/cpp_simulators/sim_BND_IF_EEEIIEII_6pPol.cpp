@@ -13,6 +13,19 @@
 namespace po = boost::program_options;
 using namespace auryn;
 
+// Convert the output identifier into a stable Auryn seed. Batch jobs use an
+// MD5 digest of theta as ID, so parsing ID as an integer is not sufficient.
+// FNV-1a is simple, deterministic, and compatible with the C++98 build flags.
+unsigned int stable_seed_from_id(const std::string &id)
+{
+	unsigned int seed = 2166136261u;
+	for (std::string::const_iterator it = id.begin(); it != id.end(); ++it) {
+		seed ^= static_cast<unsigned char>(*it);
+		seed *= 16777619u;
+	}
+	return seed;
+}
+
 
 std::vector<float> parse_input_plasticity(std::vector<std::string> rule_str)
 {
@@ -89,6 +102,8 @@ int main(int ac, char* av[])
 	int NE = 0;
 	int NI = 0;
 	int N_inputs = 0;
+	unsigned int simulation_seed = 0;
+	bool simulation_seed_provided = false;
 	float tau_ampa = 0;
 	float tau_gaba = 0;
 	float tau_nmda = 0;
@@ -105,6 +120,7 @@ int main(int ac, char* av[])
         po::options_description desc("Allowed options");
         desc.add_options()
 			("ID", po::value<std:: string>(), "ID to name the monitor output files correctly")
+			("seed", po::value<unsigned int>(), "explicit random seed; defaults to stable hash of ID")
 			("NE", po::value<int>(), "NE")
 			("NI", po::value<int>(), "NI")
 			("tau_ampa", po::value<float>(), "tau_ampa")
@@ -122,7 +138,7 @@ int main(int ac, char* av[])
 			("wie", po::value<float>(), "wie")
 			("wii", po::value<float>(), "wii")
 			("sparseness", po::value<float>(), "sparseness")
-			("N_inputs", po::value<int>(), "N_inputs")
+			("N_input", po::value<int>(), "N_input")
 			("rate_poisson", po::value<float>(), "rate_poisson")
 			("weight_poisson", po::value<float>(), "weight_poisson")
 			("radius", po::value<int>(), "radius")
@@ -146,6 +162,7 @@ int main(int ac, char* av[])
         po::store(po::parse_command_line(ac, av, desc), vm);
 
 		if (vm.count("ID")) {ID= vm["ID"].as<std::string>();}
+		if (vm.count("seed")) {simulation_seed = vm["seed"].as<unsigned int>(); simulation_seed_provided = true;}
 		if (vm.count("NE")) {NE= vm["NE"].as<int>();}
 		if (vm.count("NI")) {NI= vm["NI"].as<int>();}
 		if (vm.count("tau_ampa")) {tau_ampa = vm["tau_ampa"].as<float>();}
@@ -163,7 +180,7 @@ int main(int ac, char* av[])
 		if (vm.count("wie")) {wie = vm["wie"].as<float>();}
 		if (vm.count("wii")) {wii = vm["wii"].as<float>();}
 		if (vm.count("sparseness")) {sparseness = vm["sparseness"].as<float>();}
-		if (vm.count("N_inputs")) {N_inputs= vm["N_inputs"].as<int>();}
+		if (vm.count("N_input")) {N_inputs= vm["N_input"].as<int>();}
 		if (vm.count("rate_poisson")) {rate_poisson = vm["rate_poisson"].as<float>();}
 		if (vm.count("weight_poisson")) {weight_poisson = vm["weight_poisson"].as<float>();}
 		if (vm.count("radius")) {radius = vm["radius"].as<int>();}
@@ -203,9 +220,14 @@ int main(int ac, char* av[])
 	auryn_init(ac, av, workdir.c_str(), "default", "", NONE, NONE);
 	sys->quiet = true;
 
-	// handle randomness of simulation: by default random seed
-	std::srand(std::time(0));
-	sys->set_master_seed(std::rand());
+	// Seed Auryn and the legacy std::rand users from one reproducible source.
+	// Keep ID as the output identifier; an explicit seed controls stochasticity.
+	if (!simulation_seed_provided) {
+		simulation_seed = stable_seed_from_id(ID);
+	}
+	std::cout << "Simulation seed: " << simulation_seed << std::endl;
+	std::srand(simulation_seed);
+	sys->set_master_seed(simulation_seed);
 
 	IFGroup* neurons_e = new IFGroup(NE);
 	neurons_e->set_tau_ampa(tau_ampa); //5e-3

@@ -35,7 +35,8 @@ std::vector< std::vector<int> > RFConnection::make_RFconnectivity(int N_pre, int
 	std::vector< std::vector<int> > rf_matrix(N_pre, std::vector<int>(N_post));
 	int N_pre_2D = (int) std::sqrt(N_pre); //ADD A CHECK IF N_pre is not a square
 	// std::cout << "N_pre_2D " << N_pre_2D << std::endl;
-	std::srand(std::time(0));
+	// The simulator entry point owns seeding. Continue its deterministic
+	// std::rand stream instead of replacing it with wall-clock time.
 	int x, y;
 	std::vector<int> coords(2);
 	for (int post_ind = 0; post_ind < N_post; post_ind++)

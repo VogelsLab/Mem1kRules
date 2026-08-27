@@ -21,7 +21,8 @@ void RandStimGroup::init(StimulusGroupModeType stimulusmode, AurynFloat baserate
 	for ( NeuronID i = 0 ; i < get_rank_size() ; ++i ) activity[i] = 0.0;
 	set_baserate(baserate);
 
-	std::srand(std::time(0));
+	// The simulator entry point owns seeding. Do not overwrite its reproducible
+	// seed with wall-clock time here.
 	seed(std::rand());
 
 	set_stimulation_mode(stimulusmode); //updates stimulus_order to be stimulusmode

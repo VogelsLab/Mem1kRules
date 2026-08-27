@@ -42,8 +42,10 @@ bin_size_big: 0.1
 window_view_auto_cov: 0.5
 bin_size_fft: 0.01
 con_type: ["ee","ei","ie","ii"]
-n_dim_params: 25
+# Stored legacy theta vectors may have a 25th background-rate nuisance value.
+# BND fixes rate_poisson above and passes only theta[:24] to the four rules.
+n_dim_params: 24
 prior_params:
   low_lim: -2.
   up_lim: 2.
-  theta_dim: 25
+  theta_dim: 24
